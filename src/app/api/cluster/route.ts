@@ -51,6 +51,10 @@ export async function POST(request: Request) {
 
     const { assignments } = kMeansClusters(embeddings as number[][], k);
 
+    await prisma.event.updateMany({
+      where: { clusterId: { not: null } },
+      data: { clusterId: null },
+    });
     await prisma.cluster.deleteMany();
 
     const clusterGroups: Map<number, typeof allJobs> = new Map();

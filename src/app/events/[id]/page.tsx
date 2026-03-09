@@ -63,10 +63,15 @@ export default function EventDetailPage({
 }) {
   const { id } = use(params);
   const { data: event, mutate } = useSWR<EventData>(`/api/events/${id}`, fetcher);
+  const { data: allClusters } = useSWR<{ id: string; name: string; jobCount: number }[]>(
+    "/api/cluster",
+    fetcher
+  );
   const [sourcing, setSourcing] = useState(false);
   const [tab, setTab] = useState<"candidates" | "roles" | "companies">(
     "candidates"
   );
+  const [relinking, setRelinking] = useState(false);
 
   async function sourceCandidates() {
     if (!event?.cluster) return;
@@ -109,6 +114,17 @@ export default function EventDetailPage({
       body: JSON.stringify({ id: candidateId, inviteStatus: status }),
     });
     mutate();
+  }
+
+  async function relinkCluster(clusterId: string) {
+    setRelinking(true);
+    await fetch(`/api/events/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clusterId }),
+    });
+    mutate();
+    setRelinking(false);
   }
 
   async function updateEventStatus(status: string) {
@@ -185,13 +201,33 @@ export default function EventDetailPage({
               )}
             </div>
           </div>
-          <button
-            onClick={sourceCandidates}
-            disabled={sourcing || !event.cluster}
-            className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {sourcing ? "Sourcing..." : "Source Candidates via Exa"}
-          </button>
+          {event.cluster ? (
+            <button
+              onClick={sourceCandidates}
+              disabled={sourcing}
+              className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sourcing ? "Sourcing..." : "Source Candidates via Exa"}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <select
+                disabled={relinking}
+                onChange={(e) => {
+                  if (e.target.value) relinkCluster(e.target.value);
+                }}
+                defaultValue=""
+                className="text-[13px] border border-yc-border rounded-md px-3 py-2 focus:outline-none focus:border-yc-orange"
+              >
+                <option value="" disabled>Link a cluster...</option>
+                {allClusters?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.jobCount} jobs)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

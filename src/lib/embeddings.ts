@@ -143,8 +143,21 @@ export async function labelCluster(
     messages: [
       {
         role: "system",
-        content:
-          "You label clusters of similar job postings for a hiring event. The label should be SPECIFIC enough that a single candidate could be qualified for most jobs in the cluster. Return a JSON object with 'name' (a specific 2-5 word event theme like 'React Frontend Engineers', 'DevOps & Cloud Infrastructure', 'Founding Full-Stack Engineers', 'ML Platform Engineers', 'Sales & GTM Leaders', 'Mobile iOS Engineers') and 'keywords' (an array of 5-8 specific technical skills or requirements common across these jobs). Only return the JSON, no markdown.",
+        content: `You name hiring events for YC startups. You're given job titles and descriptions from a cluster of similar roles.
+
+Your job: name the event based on the DOMAIN or SPECIALTY these roles share — what the person actually does day-to-day. Ignore seniority words like "founding", "senior", "staff", "lead" — most YC jobs say "founding" so it's meaningless as a differentiator.
+
+Focus on the technical domain, industry vertical, or function:
+Good: "Backend Infrastructure", "AI/ML Research", "Product Design", "Healthcare Engineering", "Developer Tools", "Sales Development", "Growth Marketing", "Mobile Engineering", "Data Platform", "Robotics", "Customer Success", "DevOps & SRE", "Fintech Engineering", "Security Engineering"
+Bad: "Founding Engineers" (says nothing about domain), "Senior & Founding Engineers" (just seniority), "Founding AI & Software Engineers" (too broad, "founding" is noise), "Engineering & Product Development Roles" (vague)
+
+Rules:
+- 2-4 words max
+- Lead with the domain, NOT seniority
+- Be specific: "Computer Vision" not "AI", "Revenue Operations" not "Operations"
+- Never start with "Founding" or "Senior"
+
+Return JSON with 'name' and 'keywords' (5-8 specific technical skills shared across these jobs). Only return JSON, no markdown.`,
       },
       {
         role: "user",

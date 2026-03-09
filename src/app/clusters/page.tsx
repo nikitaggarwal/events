@@ -52,6 +52,7 @@ function ClustersContent() {
   const selectedId = searchParams.get("selected");
   const [selected, setSelected] = useState<string | null>(selectedId);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [showAllCompanies, setShowAllCompanies] = useState(false);
 
   const { data: clusters } = useSWR<ClusterSummary[]>("/api/cluster", fetcher);
   const { data: activeCluster } = useSWR<ClusterDetail>(
@@ -93,7 +94,7 @@ function ClustersContent() {
           {clusters?.map((c) => (
             <button
               key={c.id}
-              onClick={() => setSelected(c.id)}
+              onClick={() => { setSelected(c.id); setShowAllCompanies(false); }}
               className={`w-full text-left p-3 rounded-lg border transition-colors ${
                 selected === c.id
                   ? "border-yc-orange bg-yc-orange-light"
@@ -164,30 +165,47 @@ function ClustersContent() {
                   <h3 className="text-xs font-medium text-yc-text-secondary uppercase tracking-wider mb-2">
                     Companies Hiring
                   </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {activeCluster.jobs
+                  {(() => {
+                    const allCompanies = activeCluster.jobs
                       .map((j) => j.company)
                       .filter(
                         (c, i, a) =>
                           a.findIndex((x) => x.slug === c.slug) === i
-                      )
-                      .map((company) => (
-                        <a
-                          key={company.slug}
-                          href={`https://www.ycombinator.com/companies/${company.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-yc-bg rounded-md hover:bg-yc-orange-light transition-colors"
-                        >
-                          <span className="font-medium text-yc-dark">
-                            {company.name}
-                          </span>
-                          {company.batch && (
-                            <Badge variant="orange">{company.batch}</Badge>
-                          )}
-                        </a>
-                      ))}
-                  </div>
+                      );
+                    const visible = showAllCompanies ? allCompanies : allCompanies.slice(0, 20);
+                    return (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {visible.map((company) => (
+                            <a
+                              key={company.slug}
+                              href={`https://www.ycombinator.com/companies/${company.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-yc-bg rounded-md hover:bg-yc-orange-light transition-colors"
+                            >
+                              <span className="font-medium text-yc-dark">
+                                {company.name}
+                              </span>
+                              {company.batch && (
+                                <Badge variant="orange">{company.batch}</Badge>
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                        {allCompanies.length > 20 && (
+                          <button
+                            onClick={() => setShowAllCompanies(!showAllCompanies)}
+                            className="mt-2 text-[12px] font-medium text-yc-orange hover:text-yc-orange-hover transition-colors"
+                          >
+                            {showAllCompanies
+                              ? "Show fewer"
+                              : `Show all ${allCompanies.length} companies`}
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

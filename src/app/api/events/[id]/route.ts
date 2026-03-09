@@ -42,6 +42,7 @@ export async function PATCH(
       ...(body.location && { location: body.location }),
       ...(body.description !== undefined && { description: body.description }),
       ...(body.status && { status: body.status }),
+      ...(body.clusterId !== undefined && { clusterId: body.clusterId }),
     },
     include: { cluster: true, candidates: true },
   });

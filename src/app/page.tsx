@@ -55,6 +55,7 @@ export default function DemandMap() {
   const [scraping, setScraping] = useState(false);
   const [clustering, setClustering] = useState(false);
   const [status, setStatus] = useState("");
+  const [showAllThemes, setShowAllThemes] = useState(false);
 
   const jobs = jobsData?.jobs || [];
   const totalJobs = jobsData?.total || stats?.jobCount || 0;
@@ -152,7 +153,7 @@ export default function DemandMap() {
             </span>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {clusters!.map((c) => (
+            {(showAllThemes ? clusters! : clusters!.slice(0, 6)).map((c) => (
               <ClusterCard
                 key={c.id}
                 id={c.id}
@@ -164,6 +165,14 @@ export default function DemandMap() {
               />
             ))}
           </div>
+          {clusters!.length > 6 && (
+            <button
+              onClick={() => setShowAllThemes(!showAllThemes)}
+              className="mt-4 w-full py-2 text-[13px] font-medium text-yc-text-secondary border border-yc-border rounded-lg hover:bg-yc-bg transition-colors"
+            >
+              {showAllThemes ? "Show fewer" : `Show all ${clusters!.length} themes`}
+            </button>
+          )}
         </section>
       )}
 
