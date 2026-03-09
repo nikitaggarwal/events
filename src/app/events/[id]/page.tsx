@@ -3,6 +3,7 @@
 import { useState, use } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
+import { useOperations } from "@/lib/operations";
 import { Badge } from "@/components/Badge";
 import { CandidateCard } from "@/components/CandidateCard";
 import { JobCard } from "@/components/JobCard";
@@ -67,32 +68,16 @@ export default function EventDetailPage({
     "/api/cluster",
     fetcher
   );
-  const [sourcing, setSourcing] = useState(false);
+  const ops = useOperations();
+  const sourcing = ops.isRunning("source");
   const [tab, setTab] = useState<"candidates" | "roles" | "companies">(
     "candidates"
   );
   const [relinking, setRelinking] = useState(false);
 
-  async function sourceCandidates() {
+  function sourceCandidates() {
     if (!event?.cluster) return;
-    setSourcing(true);
-    try {
-      const res = await fetch("/api/source", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clusterId: event.cluster.id,
-          eventId: event.id,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        mutate();
-      }
-    } catch (err) {
-      console.error("Sourcing failed:", err);
-    }
-    setSourcing(false);
+    ops.runSourceCandidates(event.cluster.id, event.id);
   }
 
   async function updateCandidateStatus(candidateId: string, status: string) {

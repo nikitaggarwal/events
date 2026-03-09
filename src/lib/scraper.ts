@@ -149,7 +149,7 @@ export async function scrapeFromYCDirectory(): Promise<ScrapedJob[]> {
   });
 
   const allJobs: ScrapedJob[] = [];
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 20;
 
   for (let i = 0; i < sfCompanies.length; i += BATCH_SIZE) {
     const batch = sfCompanies.slice(i, i + BATCH_SIZE);
@@ -157,12 +157,66 @@ export async function scrapeFromYCDirectory(): Promise<ScrapedJob[]> {
     for (const jobs of results) {
       allJobs.push(...jobs);
     }
-    await new Promise((r) => setTimeout(r, 300));
+    if (i + BATCH_SIZE < sfCompanies.length) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 
   return allJobs.filter(
     (job, i, arr) => arr.findIndex((j) => j.jobUrl === job.jobUrl) === i
   );
+}
+
+async function scrapeWaaSRole(roleSlug: string): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  try {
+    const url = `https://www.workatastartup.com/jobs/l/${roleSlug}`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      },
+    });
+    if (!res.ok) return jobs;
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    $('a[href*="/companies/"][href*="/jobs/"]').each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href || !href.includes("ycombinator.com")) return;
+
+      const slugMatch = href.match(/\/companies\/([^/]+)\/jobs\/([^/]+)/);
+      if (!slugMatch) return;
+
+      const companySlug = slugMatch[1];
+      const jobSlugFull = slugMatch[2];
+      const titleFromSlug = jobSlugFull
+        .replace(/^[a-zA-Z0-9]+-/, "")
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      const linkEl = $(`a[href="${href}"], a[href$="${href.split("ycombinator.com")[1]}"]`);
+      const jobTitle = linkEl.text().trim() || titleFromSlug;
+
+      jobs.push({
+        title: jobTitle,
+        companyName: "",
+        companySlug,
+        batch: null,
+        companyDescription: null,
+        jobUrl: href.startsWith("http")
+          ? href
+          : `https://www.ycombinator.com${href}`,
+        location: null,
+        jobType: null,
+        role: roleSlug.replace(/-/g, " "),
+        postedAt: null,
+      });
+    });
+  } catch {
+    // skip failed role pages
+  }
+  return jobs;
 }
 
 export async function scrapeWaaSListings(): Promise<ScrapedJob[]> {
@@ -176,65 +230,12 @@ export async function scrapeWaaSListings(): Promise<ScrapedJob[]> {
     "science",
   ];
 
-  const allJobs: ScrapedJob[] = [];
+  const results = await Promise.all(roles.map(scrapeWaaSRole));
+  const allJobs = results.flat();
 
-  for (const roleSlug of roles) {
-    const url = `https://www.workatastartup.com/jobs/l/${roleSlug}`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-      },
-    });
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    const jobLinks: string[] = [];
-    $('a[href*="/companies/"][href*="/jobs/"]').each((_, el) => {
-      const href = $(el).attr("href");
-      if (href && href.includes("ycombinator.com")) {
-        jobLinks.push(href);
-      }
-    });
-
-    for (const jobUrl of jobLinks) {
-      const slugMatch = jobUrl.match(
-        /\/companies\/([^/]+)\/jobs\/([^/]+)/
-      );
-      if (!slugMatch) continue;
-
-      const companySlug = slugMatch[1];
-      const jobSlugFull = slugMatch[2];
-      const titleFromSlug = jobSlugFull
-        .replace(/^[a-zA-Z0-9]+-/, "")
-        .replace(/-/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-
-      const linkEl = $(`a[href="${jobUrl}"], a[href$="${jobUrl.split("ycombinator.com")[1]}"]`);
-      const jobTitle = linkEl.text().trim() || titleFromSlug;
-
-      allJobs.push({
-        title: jobTitle,
-        companyName: "",
-        companySlug,
-        batch: null,
-        companyDescription: null,
-        jobUrl: jobUrl.startsWith("http")
-          ? jobUrl
-          : `https://www.ycombinator.com${jobUrl}`,
-        location: null,
-        jobType: null,
-        role: roleSlug.replace(/-/g, " "),
-        postedAt: null,
-      });
-    }
-  }
-
-  const unique = allJobs.filter(
+  return allJobs.filter(
     (job, i, arr) => arr.findIndex((j) => j.jobUrl === job.jobUrl) === i
   );
-
-  return unique;
 }
 
 export async function scrapeJobDetail(

@@ -35,22 +35,24 @@ export async function POST(request: Request) {
       jobTitles
     );
 
-    const candidates = [];
-    for (const s of sourced) {
-      const candidate = await prisma.candidate.create({
-        data: {
-          name: s.name,
-          title: s.title,
-          company: s.company,
-          location: s.location,
-          profileUrl: s.profileUrl,
-          highlights: s.highlights,
-          source: s.source,
-          eventId: eventId || null,
-        },
-      });
-      candidates.push(candidate);
-    }
+    const data = sourced.map((s) => ({
+      name: s.name,
+      title: s.title,
+      company: s.company,
+      location: s.location,
+      profileUrl: s.profileUrl,
+      highlights: s.highlights,
+      source: s.source,
+      eventId: eventId || null,
+    }));
+
+    await prisma.candidate.createMany({ data });
+
+    const candidates = await prisma.candidate.findMany({
+      where: { eventId: eventId || undefined },
+      orderBy: { createdAt: "desc" },
+      take: data.length,
+    });
 
     return NextResponse.json({
       success: true,

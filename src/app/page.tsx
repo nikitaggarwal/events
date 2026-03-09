@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
+import { useOperations } from "@/lib/operations";
 import { StatsCard } from "@/components/StatsCard";
 import { ClusterCard } from "@/components/ClusterCard";
 import { JobCard } from "@/components/JobCard";
@@ -48,86 +49,19 @@ interface JobsResponse {
 }
 
 export default function DemandMap() {
-  const { data: stats, mutate: mutateStats } = useSWR<Stats>("/api/stats", fetcher);
-  const { data: clusters, mutate: mutateClusters } = useSWR<ClusterSummary[]>("/api/cluster?type=role", fetcher);
-  const { data: jobsData, mutate: mutateJobs } = useSWR<JobsResponse>("/api/scrape?limit=50", fetcher);
+  const { data: stats } = useSWR<Stats>("/api/stats", fetcher);
+  const { data: clusters } = useSWR<ClusterSummary[]>("/api/cluster?type=role", fetcher);
+  const { data: jobsData } = useSWR<JobsResponse>("/api/scrape?limit=50", fetcher);
 
-  const [scraping, setScraping] = useState(false);
-  const [clustering, setClustering] = useState(false);
-  const [domainClustering, setDomainClustering] = useState(false);
-  const [status, setStatus] = useState("");
+  const ops = useOperations();
   const [showAllThemes, setShowAllThemes] = useState(false);
 
   const jobs = jobsData?.jobs || [];
   const totalJobs = jobsData?.total || stats?.jobCount || 0;
 
-  async function runScrape() {
-    setScraping(true);
-    setStatus("Scraping WaaS + YC Directory for SF Bay Area jobs... (this may take a few minutes)");
-    try {
-      const res = await fetch("/api/scrape", { method: "POST" });
-      const data = await res.json();
-      setStatus(
-        `Found ${data.total} listings (${data.fromWaaS} from WaaS, ${data.fromYCDirectory} from YC Directory). ${data.created} new jobs added, ${data.skipped} skipped.`
-      );
-      mutateStats();
-      mutateClusters();
-      mutateJobs();
-    } catch (err) {
-      setStatus(`Scrape failed: ${err}`);
-    }
-    setScraping(false);
-  }
-
-  async function runClustering() {
-    setClustering(true);
-    setStatus("Embedding jobs and clustering...");
-    try {
-      const res = await fetch("/api/cluster", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ k: Math.max(5, Math.round(totalJobs / 45)) }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setStatus(`Clustering error: ${data.error}`);
-      } else {
-        setStatus(`Created ${data.clusterCount} clusters.`);
-        mutateStats();
-        mutateClusters();
-        mutateJobs();
-      }
-    } catch (err) {
-      setStatus(`Clustering failed: ${err}`);
-    }
-    setClustering(false);
-  }
-
-  async function runDomainClustering() {
-    setDomainClustering(true);
-    setStatus("Embedding companies and clustering by domain...");
-    try {
-      const companyCount = stats?.companyCount || 0;
-      const res = await fetch("/api/cluster", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "domain",
-          k: Math.max(5, Math.round(companyCount / 40)),
-        }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setStatus(`Domain clustering error: ${data.error}`);
-      } else {
-        setStatus(`Created ${data.clusterCount} domain clusters.`);
-        mutateStats();
-      }
-    } catch (err) {
-      setStatus(`Domain clustering failed: ${err}`);
-    }
-    setDomainClustering(false);
-  }
+  const scraping = ops.isRunning("scrape");
+  const clustering = ops.isRunning("cluster-role");
+  const domainClustering = ops.isRunning("cluster-domain");
 
   return (
     <div className="p-4 pt-14 md:pt-8 md:p-8 max-w-[1200px]">
@@ -140,21 +74,21 @@ export default function DemandMap() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
-            onClick={runScrape}
+            onClick={() => ops.runScrape()}
             disabled={scraping}
             className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {scraping ? "Scraping..." : "Scrape Jobs"}
           </button>
           <button
-            onClick={runClustering}
+            onClick={() => ops.runClustering(Math.max(5, Math.round(totalJobs / 45)))}
             disabled={clustering || totalJobs === 0}
             className="px-4 py-2 text-[13px] font-medium border border-yc-border text-yc-dark rounded-md hover:bg-yc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {clustering ? "Clustering..." : "Cluster by Role"}
           </button>
           <button
-            onClick={runDomainClustering}
+            onClick={() => ops.runDomainClustering(Math.max(5, Math.round((stats?.companyCount || 0) / 40)))}
             disabled={domainClustering || (stats?.companyCount ?? 0) === 0}
             className="px-4 py-2 text-[13px] font-medium border border-yc-border text-yc-dark rounded-md hover:bg-yc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -162,12 +96,6 @@ export default function DemandMap() {
           </button>
         </div>
       </div>
-
-      {status && (
-        <div className="mb-6 px-4 py-3 bg-yc-orange-light border border-yc-orange/20 rounded-lg text-sm text-yc-dark">
-          {status}
-        </div>
-      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
         <StatsCard label="Total Jobs" value={stats?.jobCount ?? 0} subtitle="SF Bay Area" />

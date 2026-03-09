@@ -12,11 +12,6 @@ export const maxDuration = 300;
 
 async function processJob(listing: ScrapedJob): Promise<"created" | "skipped" | "error"> {
   try {
-    const existing = await prisma.job.findUnique({
-      where: { sourceUrl: listing.jobUrl },
-    });
-    if (existing) return "skipped";
-
     let detail = null;
     try {
       detail = await scrapeJobDetail(listing.jobUrl);
@@ -90,25 +85,32 @@ async function processJob(listing: ScrapedJob): Promise<"created" | "skipped" | 
 
 export async function POST() {
   try {
-    const [waasListings, ycDirListings] = await Promise.all([
+    const [waasListings, ycDirListings, existingJobs] = await Promise.all([
       scrapeWaaSListings(),
       scrapeFromYCDirectory(),
+      prisma.job.findMany({ select: { sourceUrl: true } }),
     ]);
+
+    const existingUrls = new Set(
+      existingJobs.map((j) => j.sourceUrl).filter(Boolean)
+    );
 
     const allListings = [...waasListings, ...ycDirListings].filter(
       (job, i, arr) => arr.findIndex((j) => j.jobUrl === job.jobUrl) === i
     );
 
+    const newListings = allListings.filter((l) => !existingUrls.has(l.jobUrl));
+    const skipped = allListings.length - newListings.length;
     let created = 0;
-    let skipped = 0;
-    const DETAIL_BATCH = 5;
+    let errors = 0;
+    const DETAIL_BATCH = 25;
 
-    for (let i = 0; i < allListings.length; i += DETAIL_BATCH) {
-      const batch = allListings.slice(i, i + DETAIL_BATCH);
+    for (let i = 0; i < newListings.length; i += DETAIL_BATCH) {
+      const batch = newListings.slice(i, i + DETAIL_BATCH);
       const results = await Promise.all(batch.map(processJob));
       for (const r of results) {
         if (r === "created") created++;
-        else if (r === "skipped") skipped++;
+        else if (r === "error") errors++;
       }
     }
 

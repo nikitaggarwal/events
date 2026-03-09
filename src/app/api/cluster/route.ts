@@ -27,6 +27,9 @@ async function pruneInvalidJobs() {
   return badIds.length;
 }
 
+const LABEL_CONCURRENCY = 5;
+const EMBED_WRITE_BATCH = 50;
+
 async function clusterByRole(k: number) {
   await pruneInvalidJobs();
   const jobs = await prisma.job.findMany({ include: { company: true } });
@@ -48,16 +51,22 @@ async function clusterByRole(k: number) {
     );
     const newEmbeddings = await getEmbeddings(textsToEmbed);
     for (let i = 0; i < needsEmbedding.length; i++) {
-      await prisma.job.update({
-        where: { id: needsEmbedding[i].id },
-        data: { embedding: newEmbeddings[i] },
-      });
       needsEmbedding[i].embedding = newEmbeddings[i];
+    }
+    for (let i = 0; i < needsEmbedding.length; i += EMBED_WRITE_BATCH) {
+      const batch = needsEmbedding.slice(i, i + EMBED_WRITE_BATCH);
+      await Promise.all(
+        batch.map((j, idx) =>
+          prisma.job.update({
+            where: { id: j.id },
+            data: { embedding: newEmbeddings[i + idx] },
+          })
+        )
+      );
     }
   }
 
-  const allJobs = await prisma.job.findMany({ include: { company: true } });
-  const embeddings = allJobs.map((j) => j.embedding);
+  const embeddings = jobs.map((j) => j.embedding);
   const { assignments } = kMeansClusters(embeddings as number[][], k);
 
   await prisma.event.updateMany({
@@ -66,47 +75,60 @@ async function clusterByRole(k: number) {
   });
   await prisma.cluster.deleteMany({ where: { type: "role" } });
 
-  const clusterGroups: Map<number, typeof allJobs> = new Map();
-  for (let i = 0; i < allJobs.length; i++) {
+  const clusterGroups: Map<number, typeof jobs> = new Map();
+  for (let i = 0; i < jobs.length; i++) {
     const cIdx = assignments[i];
     if (!clusterGroups.has(cIdx)) clusterGroups.set(cIdx, []);
-    clusterGroups.get(cIdx)!.push(allJobs[i]);
+    clusterGroups.get(cIdx)!.push(jobs[i]);
   }
 
-  const clusters = [];
-  for (const [, groupJobs] of clusterGroups) {
-    const titles = groupJobs.map((j) => j.title);
-    const descriptions = groupJobs
-      .filter((j) => j.description)
-      .map((j) => j.description!);
+  const groupEntries = Array.from(clusterGroups.values());
 
-    const { name, keywords } = await labelCluster(titles, descriptions);
-    const uniqueCompanies = new Set(groupJobs.map((j) => j.company.name));
+  const labels: { name: string; keywords: string[] }[] = [];
+  for (let i = 0; i < groupEntries.length; i += LABEL_CONCURRENCY) {
+    const batch = groupEntries.slice(i, i + LABEL_CONCURRENCY);
+    const batchLabels = await Promise.all(
+      batch.map((groupJobs) => {
+        const titles = groupJobs.map((j) => j.title);
+        const descriptions = groupJobs
+          .filter((j) => j.description)
+          .map((j) => j.description!);
+        return labelCluster(titles, descriptions);
+      })
+    );
+    labels.push(...batchLabels);
+  }
 
-    const cluster = await prisma.cluster.create({
-      data: {
+  const clusters = await Promise.all(
+    groupEntries.map(async (groupJobs, idx) => {
+      const { name, keywords } = labels[idx];
+      const uniqueCompanies = new Set(groupJobs.map((j) => j.company.name));
+
+      const cluster = await prisma.cluster.create({
+        data: {
+          name,
+          type: "role",
+          keywords,
+          jobCount: groupJobs.length,
+          companyCount: uniqueCompanies.size,
+        },
+      });
+
+      await prisma.job.updateMany({
+        where: { id: { in: groupJobs.map((j) => j.id) } },
+        data: { clusterId: cluster.id },
+      });
+
+      return {
+        id: cluster.id,
         name,
-        type: "role",
         keywords,
         jobCount: groupJobs.length,
         companyCount: uniqueCompanies.size,
-      },
-    });
-
-    await prisma.job.updateMany({
-      where: { id: { in: groupJobs.map((j) => j.id) } },
-      data: { clusterId: cluster.id },
-    });
-
-    clusters.push({
-      id: cluster.id,
-      name,
-      keywords,
-      jobCount: groupJobs.length,
-      companyCount: uniqueCompanies.size,
-      topCompanies: Array.from(uniqueCompanies).slice(0, 5),
-    });
-  }
+        topCompanies: Array.from(uniqueCompanies).slice(0, 5),
+      };
+    })
+  );
 
   return NextResponse.json({ success: true, clusterCount: clusters.length, clusters });
 }
@@ -132,19 +154,22 @@ async function clusterByDomain(k: number) {
     );
     const newEmbeddings = await getEmbeddings(textsToEmbed);
     for (let i = 0; i < needsEmbedding.length; i++) {
-      await prisma.company.update({
-        where: { id: needsEmbedding[i].id },
-        data: { embedding: newEmbeddings[i] },
-      });
       needsEmbedding[i].embedding = newEmbeddings[i];
+    }
+    for (let i = 0; i < needsEmbedding.length; i += EMBED_WRITE_BATCH) {
+      const batch = needsEmbedding.slice(i, i + EMBED_WRITE_BATCH);
+      await Promise.all(
+        batch.map((c, idx) =>
+          prisma.company.update({
+            where: { id: c.id },
+            data: { embedding: newEmbeddings[i + idx] },
+          })
+        )
+      );
     }
   }
 
-  const allCompanies = await prisma.company.findMany({
-    include: { jobs: true },
-  });
-  const withJobs = allCompanies.filter((c) => c.jobs.length > 0);
-  const embeddings = withJobs.map((c) => c.embedding);
+  const embeddings = companiesWithJobs.map((c) => c.embedding);
   const { assignments } = kMeansClusters(embeddings as number[][], k);
 
   await prisma.event.updateMany({
@@ -157,49 +182,60 @@ async function clusterByDomain(k: number) {
   });
   await prisma.cluster.deleteMany({ where: { type: "domain" } });
 
-  const groups: Map<number, typeof withJobs> = new Map();
-  for (let i = 0; i < withJobs.length; i++) {
+  const groups: Map<number, typeof companiesWithJobs> = new Map();
+  for (let i = 0; i < companiesWithJobs.length; i++) {
     const cIdx = assignments[i];
     if (!groups.has(cIdx)) groups.set(cIdx, []);
-    groups.get(cIdx)!.push(withJobs[i]);
+    groups.get(cIdx)!.push(companiesWithJobs[i]);
   }
 
-  const clusters = [];
-  for (const [, groupCompanies] of groups) {
-    const names = groupCompanies.map((c) => c.name);
-    const descriptions = groupCompanies
-      .filter((c) => c.description)
-      .map((c) => c.description!);
+  const groupEntries = Array.from(groups.values());
 
-    const { name, keywords } = await labelDomainCluster(names, descriptions);
+  const labels: { name: string; keywords: string[] }[] = [];
+  for (let i = 0; i < groupEntries.length; i += LABEL_CONCURRENCY) {
+    const batch = groupEntries.slice(i, i + LABEL_CONCURRENCY);
+    const batchLabels = await Promise.all(
+      batch.map((groupCompanies) => {
+        const names = groupCompanies.map((c) => c.name);
+        const descriptions = groupCompanies
+          .filter((c) => c.description)
+          .map((c) => c.description!);
+        return labelDomainCluster(names, descriptions);
+      })
+    );
+    labels.push(...batchLabels);
+  }
 
-    const allGroupJobs = groupCompanies.flatMap((c) => c.jobs);
-    const jobCount = allGroupJobs.length;
+  const clusters = await Promise.all(
+    groupEntries.map(async (groupCompanies, idx) => {
+      const { name, keywords } = labels[idx];
+      const allGroupJobs = groupCompanies.flatMap((c) => c.jobs);
 
-    const cluster = await prisma.cluster.create({
-      data: {
+      const cluster = await prisma.cluster.create({
+        data: {
+          name,
+          type: "domain",
+          keywords,
+          jobCount: allGroupJobs.length,
+          companyCount: groupCompanies.length,
+        },
+      });
+
+      await prisma.company.updateMany({
+        where: { id: { in: groupCompanies.map((c) => c.id) } },
+        data: { domainClusterId: cluster.id },
+      });
+
+      return {
+        id: cluster.id,
         name,
-        type: "domain",
         keywords,
-        jobCount,
+        jobCount: allGroupJobs.length,
         companyCount: groupCompanies.length,
-      },
-    });
-
-    await prisma.company.updateMany({
-      where: { id: { in: groupCompanies.map((c) => c.id) } },
-      data: { domainClusterId: cluster.id },
-    });
-
-    clusters.push({
-      id: cluster.id,
-      name,
-      keywords,
-      jobCount,
-      companyCount: groupCompanies.length,
-      topCompanies: names.slice(0, 5),
-    });
-  }
+        topCompanies: groupCompanies.map((c) => c.name).slice(0, 5),
+      };
+    })
+  );
 
   return NextResponse.json({ success: true, clusterCount: clusters.length, clusters });
 }
