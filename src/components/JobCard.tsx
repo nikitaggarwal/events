@@ -69,9 +69,9 @@ export function JobCard({
 
       {skills && skills.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {skills.slice(0, 6).map((skill) => (
+          {skills.slice(0, 6).map((skill, i) => (
             <span
-              key={skill}
+              key={`${skill}-${i}`}
               className="text-[10px] text-yc-text-secondary bg-yc-bg px-1.5 py-0.5 rounded"
             >
               {skill}
