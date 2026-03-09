@@ -30,6 +30,14 @@ export default function EventsPage() {
   const [newName, setNewName] = useState("");
   const [newDate, setNewDate] = useState("");
 
+  async function deleteEvent(e: React.MouseEvent, eventId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this event and all its sourced candidates?")) return;
+    await fetch(`/api/events/${eventId}`, { method: "DELETE" });
+    mutate();
+  }
+
   async function createEvent(e: React.FormEvent) {
     e.preventDefault();
     const res = await fetch("/api/events", {
@@ -171,6 +179,15 @@ export default function EventsPage() {
                     </div>
                     <div>RSVP</div>
                   </div>
+                  <button
+                    onClick={(e) => deleteEvent(e, event.id)}
+                    className="ml-2 p-1.5 text-yc-text-secondary/40 hover:text-red-500 transition-colors rounded"
+                    title="Delete event"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </Link>

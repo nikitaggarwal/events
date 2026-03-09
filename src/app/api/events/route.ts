@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const events = await prisma.event.findMany({
     include: {
-      cluster: true,
-      candidates: true,
+      cluster: { select: { id: true, name: true } },
+      candidates: { select: { id: true, inviteStatus: true } },
     },
     orderBy: { createdAt: "desc" },
   });

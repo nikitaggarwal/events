@@ -12,6 +12,11 @@ export async function GET(
       cluster: {
         include: {
           jobs: { include: { company: true } },
+          companies: {
+            include: {
+              jobs: { include: { company: true } },
+            },
+          },
         },
       },
       candidates: { orderBy: { fitScore: "desc" } },
@@ -22,7 +27,20 @@ export async function GET(
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  return NextResponse.json(event, {
+  if (event.cluster && event.cluster.type === "domain") {
+    const domainJobs = event.cluster.companies.flatMap((c) => c.jobs);
+    return NextResponse.json(
+      { ...event, cluster: { ...event.cluster, jobs: domainJobs, companies: undefined } },
+      { headers: { "Cache-Control": "s-maxage=15, stale-while-revalidate=60" } }
+    );
+  }
+
+  const { ...rest } = event;
+  if (rest.cluster) {
+    (rest.cluster as Record<string, unknown>).companies = undefined;
+  }
+
+  return NextResponse.json(rest, {
     headers: { "Cache-Control": "s-maxage=15, stale-while-revalidate=60" },
   });
 }

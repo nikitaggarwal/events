@@ -74,6 +74,9 @@ export default function EventDetailPage({
     "candidates"
   );
   const [relinking, setRelinking] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   function sourceCandidates() {
     if (!event?.cluster) return;
@@ -121,19 +124,40 @@ export default function EventDetailPage({
     mutate();
   }
 
+  async function saveEventName() {
+    const trimmed = editName.trim();
+    if (!trimmed || trimmed === event?.name) {
+      setEditing(false);
+      return;
+    }
+    await fetch(`/api/events/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    mutate();
+    setEditing(false);
+  }
+
+  async function deleteEvent() {
+    if (!confirm("Delete this event and all its sourced candidates?")) return;
+    setDeleting(true);
+    await fetch(`/api/events/${id}`, { method: "DELETE" });
+    window.location.href = "/events";
+  }
+
   if (!event) {
     return (
       <div className="p-8 text-sm text-yc-text-secondary">Loading...</div>
     );
   }
 
+  const candidates = event.candidates || [];
   const statusCounts = {
-    total: event.candidates.length,
-    contacted: event.candidates.filter((c) => c.inviteStatus === "contacted")
-      .length,
-    rsvp: event.candidates.filter((c) => c.inviteStatus === "rsvp").length,
-    attended: event.candidates.filter((c) => c.inviteStatus === "attended")
-      .length,
+    total: candidates.length,
+    contacted: candidates.filter((c) => c.inviteStatus === "contacted").length,
+    rsvp: candidates.filter((c) => c.inviteStatus === "rsvp").length,
+    attended: candidates.filter((c) => c.inviteStatus === "attended").length,
   };
 
   const uniqueCompanies = event.cluster
@@ -155,9 +179,30 @@ export default function EventDetailPage({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-semibold text-yc-dark">
-                {event.name}
-              </h1>
+              {editing ? (
+                <form
+                  onSubmit={(e) => { e.preventDefault(); saveEventName(); }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onBlur={saveEventName}
+                    onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
+                    className="text-xl font-semibold text-yc-dark border-b-2 border-yc-orange bg-transparent focus:outline-none px-0 py-0"
+                  />
+                </form>
+              ) : (
+                <h1
+                  className="text-xl font-semibold text-yc-dark cursor-pointer hover:text-yc-orange transition-colors"
+                  onClick={() => { setEditName(event.name); setEditing(true); }}
+                  title="Click to rename"
+                >
+                  {event.name}
+                </h1>
+              )}
               <select
                 value={event.status}
                 onChange={(e) => updateEventStatus(e.target.value)}
@@ -259,7 +304,7 @@ export default function EventDetailPage({
         <div className="flex gap-4 sm:gap-6 min-w-max">
           {(
             [
-              ["candidates", `Candidates (${event.candidates.length})`],
+              ["candidates", `Candidates (${candidates.length})`],
               [
                 "roles",
                 `Open Roles (${event.cluster?.jobs.length || 0})`,
@@ -284,7 +329,7 @@ export default function EventDetailPage({
 
       {tab === "candidates" && (
         <div className="space-y-3">
-          {event.candidates.map((c) => (
+          {candidates.map((c) => (
             <CandidateCard
               key={c.id}
               id={c.id}
@@ -300,7 +345,7 @@ export default function EventDetailPage({
               onStatusChange={updateCandidateStatus}
             />
           ))}
-          {event.candidates.length === 0 && (
+          {candidates.length === 0 && (
             <div className="text-center py-12 text-sm text-yc-text-secondary">
               {event.cluster ? (
                 <>
@@ -381,6 +426,16 @@ export default function EventDetailPage({
           })}
         </div>
       )}
+
+      <div className="mt-12 pt-6 border-t border-yc-border">
+        <button
+          onClick={deleteEvent}
+          disabled={deleting}
+          className="px-4 py-2 text-[13px] font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {deleting ? "Deleting..." : "Delete Event"}
+        </button>
+      </div>
     </div>
   );
 }
