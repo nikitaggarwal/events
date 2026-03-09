@@ -1,0 +1,108 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NAV_ITEMS = [
+  { href: "/", label: "Demand Map", icon: "chart" },
+  { href: "/clusters", label: "Clusters", icon: "grid" },
+  { href: "/events", label: "Events", icon: "calendar" },
+  { href: "/candidates", label: "Candidates", icon: "users" },
+];
+
+function NavIcon({ icon, active }: { icon: string; active: boolean }) {
+  const color = active ? "#f26625" : "#737373";
+
+  switch (icon) {
+    case "chart":
+      return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="10" width="3" height="7" rx="0.5" fill={color} />
+          <rect x="5.5" y="6" width="3" height="11" rx="0.5" fill={color} />
+          <rect x="10" y="3" width="3" height="14" rx="0.5" fill={color} />
+          <rect x="14.5" y="1" width="3" height="16" rx="0.5" fill={color} />
+        </svg>
+      );
+    case "grid":
+      return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="1" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" />
+          <rect x="10" y="1" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" />
+          <rect x="1" y="10" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" />
+          <rect x="10" y="10" width="7" height="7" rx="1" stroke={color} strokeWidth="1.5" />
+        </svg>
+      );
+    case "calendar":
+      return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="3" width="16" height="14" rx="1.5" stroke={color} strokeWidth="1.5" />
+          <line x1="1" y1="7.5" x2="17" y2="7.5" stroke={color} strokeWidth="1.5" />
+          <line x1="5" y1="1" x2="5" y2="4" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="13" y1="1" x2="13" y2="4" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="6.5" cy="5" r="2.5" stroke={color} strokeWidth="1.5" />
+          <path d="M1 16c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="13" cy="5.5" r="2" stroke={color} strokeWidth="1.2" />
+          <path d="M14 11c1.5.5 3 2 3 5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+export function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside className="fixed left-0 top-0 h-screen w-60 bg-white border-r border-yc-border flex flex-col z-50">
+      <div className="p-5 border-b border-yc-border">
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-yc-orange rounded flex items-center justify-center">
+            <span className="text-white text-xs font-bold">Y</span>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-yc-dark">Event Ops</div>
+            <div className="text-[11px] text-yc-text-secondary">
+              Work at a Startup
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      <nav className="flex-1 py-3">
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(item.href);
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-5 py-2.5 text-[13px] transition-colors ${
+                isActive
+                  ? "text-yc-orange bg-yc-orange-light font-medium border-r-2 border-yc-orange"
+                  : "text-yc-text-secondary hover:text-yc-dark hover:bg-yc-bg"
+              }`}
+            >
+              <NavIcon icon={item.icon} active={isActive} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="p-4 border-t border-yc-border">
+        <div className="text-[11px] text-yc-text-secondary">
+          YC Event Ops Console
+        </div>
+      </div>
+    </aside>
+  );
+}

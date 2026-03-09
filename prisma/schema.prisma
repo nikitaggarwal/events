@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  batch       String?
+  description String?
+  url         String?
+  logoUrl     String?
+  jobs        Job[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String?
+  location    String?
+  jobType     String?
+  role        String?
+  experience  String?
+  salaryMin   Int?
+  salaryMax   Int?
+  equity      String?
+  visa        String?
+  skills      String[]
+  description String?
+  sourceUrl   String?  @unique
+  postedAt    String?
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  clusterId   String?
+  cluster     Cluster? @relation(fields: [clusterId], references: [id])
+  embedding   Float[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Cluster {
+  id           String   @id @default(cuid())
+  name         String
+  keywords     String[]
+  jobCount     Int      @default(0)
+  companyCount Int      @default(0)
+  jobs         Job[]
+  events       Event[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Event {
+  id          String      @id @default(cuid())
+  name        String
+  date        DateTime?
+  location    String?
+  description String?
+  clusterId   String?
+  cluster     Cluster?    @relation(fields: [clusterId], references: [id])
+  status      String      @default("draft")
+  candidates  Candidate[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Candidate {
+  id           String   @id @default(cuid())
+  name         String
+  title        String?
+  company      String?
+  location     String?
+  profileUrl   String?
+  linkedinUrl  String?
+  githubUrl    String?
+  highlights   String?
+  fitScore     Float?
+  fitReason    String?
+  source       String?
+  inviteStatus String   @default("not_contacted")
+  eventId      String?
+  event        Event?   @relation(fields: [eventId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
