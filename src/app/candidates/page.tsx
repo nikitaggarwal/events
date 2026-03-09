@@ -50,7 +50,7 @@ export default function CandidatesPage() {
   };
 
   return (
-    <div className="p-8 max-w-[1200px]">
+    <div className="p-4 pt-14 md:pt-8 md:p-8 max-w-[1200px]">
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-yc-dark">All Candidates</h1>
         <p className="text-sm text-yc-text-secondary mt-1">
@@ -58,7 +58,7 @@ export default function CandidatesPage() {
         </p>
       </div>
 
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         {(
           [
             ["all", "All"],

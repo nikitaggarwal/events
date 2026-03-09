@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -57,52 +58,89 @@ function NavIcon({ icon, active }: { icon: string; active: boolean }) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-60 bg-white border-r border-yc-border flex flex-col z-50">
-      <div className="p-5 border-b border-yc-border">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-yc-orange rounded flex items-center justify-center">
-            <span className="text-white text-xs font-bold">Y</span>
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-yc-dark">Event Ops</div>
-            <div className="text-[11px] text-yc-text-secondary">
-              Work at a Startup
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed top-3 left-3 z-50 p-2 rounded-md bg-white border border-yc-border shadow-sm md:hidden"
+        aria-label="Open menu"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M3 5h14M3 10h14M3 15h14" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40 md:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-screen w-60 bg-white border-r border-yc-border flex flex-col z-50 transition-transform duration-200 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0`}
+      >
+        <div className="p-5 border-b border-yc-border flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-yc-orange rounded flex items-center justify-center">
+              <span className="text-white text-xs font-bold">Y</span>
             </div>
-          </div>
-        </Link>
-      </div>
-
-      <nav className="flex-1 py-3">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-5 py-2.5 text-[13px] transition-colors ${
-                isActive
-                  ? "text-yc-orange bg-yc-orange-light font-medium border-r-2 border-yc-orange"
-                  : "text-yc-text-secondary hover:text-yc-dark hover:bg-yc-bg"
-              }`}
-            >
-              <NavIcon icon={item.icon} active={isActive} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-yc-border">
-        <div className="text-[11px] text-yc-text-secondary">
-          YC Event Ops Console
+            <div>
+              <div className="text-sm font-semibold text-yc-dark">Event Ops</div>
+              <div className="text-[11px] text-yc-text-secondary">
+                Work at a Startup
+              </div>
+            </div>
+          </Link>
+          <button
+            onClick={() => setOpen(false)}
+            className="p-1 rounded md:hidden"
+            aria-label="Close menu"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M4 4l10 10M14 4L4 14" stroke="#737373" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
-      </div>
-    </aside>
+
+        <nav className="flex-1 py-3">
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-5 py-2.5 text-[13px] transition-colors ${
+                  isActive
+                    ? "text-yc-orange bg-yc-orange-light font-medium border-r-2 border-yc-orange"
+                    : "text-yc-text-secondary hover:text-yc-dark hover:bg-yc-bg"
+                }`}
+              >
+                <NavIcon icon={item.icon} active={isActive} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-yc-border">
+          <div className="text-[11px] text-yc-text-secondary">
+            YC Event Ops Console
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

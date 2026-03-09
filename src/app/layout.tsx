@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <div className="flex min-h-screen">
           <Sidebar />
-          <main className="flex-1 ml-60">{children}</main>
+          <main className="flex-1 md:ml-60">{children}</main>
         </div>
       </body>
     </html>

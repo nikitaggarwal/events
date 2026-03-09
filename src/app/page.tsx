@@ -130,15 +130,15 @@ export default function DemandMap() {
   }
 
   return (
-    <div className="p-8 max-w-[1200px]">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 pt-14 md:pt-8 md:p-8 max-w-[1200px]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-xl font-semibold text-yc-dark">Demand Map</h1>
           <p className="text-sm text-yc-text-secondary mt-1">
             SF Bay Area YC startup hiring demand, clustered by role type
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={runScrape}
             disabled={scraping}
@@ -169,7 +169,7 @@ export default function DemandMap() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
         <StatsCard label="Total Jobs" value={stats?.jobCount ?? 0} subtitle="SF Bay Area" />
         <StatsCard label="Companies" value={stats?.companyCount ?? 0} subtitle="YC startups" />
         <StatsCard label="Clusters" value={stats?.clusterCount ?? 0} subtitle="Role themes" />
@@ -186,7 +186,7 @@ export default function DemandMap() {
               By demand (roles + companies)
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             {(showAllThemes ? clusters! : clusters!.slice(0, 6)).map((c) => (
               <ClusterCard
                 key={c.id}

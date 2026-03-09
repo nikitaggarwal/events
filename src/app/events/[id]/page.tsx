@@ -158,7 +158,7 @@ export default function EventDetailPage({
     : [];
 
   return (
-    <div className="p-8 max-w-[1200px]">
+    <div className="p-4 pt-14 md:pt-8 md:p-8 max-w-[1200px]">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-2">
           <a href="/events" className="hover:text-yc-dark">
@@ -167,9 +167,9 @@ export default function EventDetailPage({
           <span>/</span>
           <span>{event.name}</span>
         </div>
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-semibold text-yc-dark">
                 {event.name}
               </h1>
@@ -184,7 +184,7 @@ export default function EventDetailPage({
                 <option value="completed">Completed</option>
               </select>
             </div>
-            <div className="mt-1 flex items-center gap-3 text-sm text-yc-text-secondary">
+            <div className="mt-1 flex items-center gap-3 text-sm text-yc-text-secondary flex-wrap">
               {event.date && (
                 <span>
                   {new Date(event.date).toLocaleDateString("en-US", {
@@ -205,28 +205,26 @@ export default function EventDetailPage({
             <button
               onClick={sourceCandidates}
               disabled={sourcing}
-              className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {sourcing ? "Sourcing..." : "Source Candidates via Exa"}
             </button>
           ) : (
-            <div className="flex items-center gap-2">
-              <select
-                disabled={relinking}
-                onChange={(e) => {
-                  if (e.target.value) relinkCluster(e.target.value);
-                }}
-                defaultValue=""
-                className="text-[13px] border border-yc-border rounded-md px-3 py-2 focus:outline-none focus:border-yc-orange"
-              >
-                <option value="" disabled>Link a cluster...</option>
-                {allClusters?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.jobCount} jobs)
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              disabled={relinking}
+              onChange={(e) => {
+                if (e.target.value) relinkCluster(e.target.value);
+              }}
+              defaultValue=""
+              className="text-[13px] border border-yc-border rounded-md px-3 py-2 focus:outline-none focus:border-yc-orange w-full sm:w-auto"
+            >
+              <option value="" disabled>Link a cluster...</option>
+              {allClusters?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.jobCount} jobs)
+                </option>
+              ))}
+            </select>
           )}
         </div>
       </div>
@@ -237,7 +235,7 @@ export default function EventDetailPage({
         </p>
       )}
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <div className="bg-white border border-yc-border rounded-lg p-4 text-center">
           <div className="text-2xl font-semibold text-yc-dark">
             {statusCounts.total}
@@ -272,8 +270,8 @@ export default function EventDetailPage({
         </div>
       </div>
 
-      <div className="border-b border-yc-border mb-6">
-        <div className="flex gap-6">
+      <div className="border-b border-yc-border mb-6 overflow-x-auto">
+        <div className="flex gap-4 sm:gap-6 min-w-max">
           {(
             [
               ["candidates", `Candidates (${event.candidates.length})`],
@@ -360,7 +358,7 @@ export default function EventDetailPage({
       )}
 
       {tab === "companies" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {uniqueCompanies.map((company) => {
             const companyJobs =
               event.cluster?.jobs.filter(

@@ -35,7 +35,7 @@ export function JobCard({
   const salary = formatSalary(salaryMin, salaryMax);
 
   return (
-    <div className="bg-white border border-yc-border rounded-lg p-4 hover:border-yc-orange/30 transition-colors flex items-center gap-4">
+    <div className="bg-white border border-yc-border rounded-lg p-4 hover:border-yc-orange/30 transition-colors flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h4 className="text-sm font-medium text-yc-dark truncate">
@@ -78,7 +78,7 @@ export function JobCard({
           href={sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="shrink-0 px-3 py-1.5 text-[12px] font-medium text-white bg-yc-orange rounded-md hover:bg-yc-orange-hover transition-colors"
+          className="shrink-0 px-3 py-1.5 text-[12px] font-medium text-white bg-yc-orange rounded-md hover:bg-yc-orange-hover transition-colors text-center sm:text-left"
         >
           View Role →
         </a>

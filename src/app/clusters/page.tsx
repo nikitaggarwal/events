@@ -91,7 +91,7 @@ function ClustersContent() {
   }
 
   return (
-    <div className="p-8 max-w-[1200px]">
+    <div className="p-4 pt-14 md:pt-8 md:p-8 max-w-[1200px]">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-yc-dark">Clusters</h1>
         <p className="text-sm text-yc-text-secondary mt-1">
@@ -124,8 +124,9 @@ function ClustersContent() {
         </button>
       </div>
 
-      <div className="flex gap-6">
-        <div className="w-72 shrink-0 space-y-2">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Cluster list — hidden on small screens when a cluster is selected */}
+        <div className={`w-full lg:w-72 shrink-0 space-y-2 ${selected ? "hidden lg:block" : ""}`}>
           {clusters?.map((c) => (
             <button
               key={c.id}
@@ -159,7 +160,20 @@ function ClustersContent() {
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
+        {/* Detail panel — on small screens, shows a back button when selected */}
+        <div className={`flex-1 min-w-0 ${!selected ? "hidden lg:block" : ""}`}>
+          {selected && (
+            <button
+              onClick={() => setSelected(null)}
+              className="mb-4 flex items-center gap-1 text-[13px] text-yc-text-secondary hover:text-yc-dark transition-colors lg:hidden"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to clusters
+            </button>
+          )}
+
           {selected && !activeCluster && (
             <div className="text-center py-16 text-sm text-yc-text-secondary">
               Loading cluster details...
@@ -168,7 +182,7 @@ function ClustersContent() {
           {activeCluster ? (
             <>
               <div className="bg-white border border-yc-border rounded-lg p-5 mb-4">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-yc-dark">
                       {activeCluster.name}
@@ -181,7 +195,7 @@ function ClustersContent() {
                   <button
                     onClick={() => createEventFromCluster(activeCluster)}
                     disabled={creatingEvent}
-                    className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 w-full sm:w-auto"
                   >
                     {creatingEvent
                       ? "Creating..."
