@@ -85,6 +85,7 @@ async function clusterByRole(k: number) {
   const groupEntries = Array.from(clusterGroups.values());
 
   const labels: { name: string; keywords: string[] }[] = [];
+  const usedNames: string[] = [];
   for (let i = 0; i < groupEntries.length; i += LABEL_CONCURRENCY) {
     const batch = groupEntries.slice(i, i + LABEL_CONCURRENCY);
     const batchLabels = await Promise.all(
@@ -93,9 +94,10 @@ async function clusterByRole(k: number) {
         const descriptions = groupJobs
           .filter((j) => j.description)
           .map((j) => j.description!);
-        return labelCluster(titles, descriptions);
+        return labelCluster(titles, descriptions, usedNames);
       })
     );
+    for (const l of batchLabels) usedNames.push(l.name);
     labels.push(...batchLabels);
   }
 
@@ -192,6 +194,7 @@ async function clusterByDomain(k: number) {
   const groupEntries = Array.from(groups.values());
 
   const labels: { name: string; keywords: string[] }[] = [];
+  const usedNames: string[] = [];
   for (let i = 0; i < groupEntries.length; i += LABEL_CONCURRENCY) {
     const batch = groupEntries.slice(i, i + LABEL_CONCURRENCY);
     const batchLabels = await Promise.all(
@@ -200,9 +203,10 @@ async function clusterByDomain(k: number) {
         const descriptions = groupCompanies
           .filter((c) => c.description)
           .map((c) => c.description!);
-        return labelDomainCluster(names, descriptions);
+        return labelDomainCluster(names, descriptions, usedNames);
       })
     );
+    for (const l of batchLabels) usedNames.push(l.name);
     labels.push(...batchLabels);
   }
 

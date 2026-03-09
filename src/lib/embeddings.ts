@@ -130,13 +130,19 @@ export function kMeansClusters(
 
 export async function labelCluster(
   jobTitles: string[],
-  jobDescriptions: string[]
+  jobDescriptions: string[],
+  existingNames: string[] = []
 ): Promise<{ name: string; keywords: string[] }> {
   const sample = jobTitles.slice(0, 20).join("\n");
   const descSample = jobDescriptions
     .slice(0, 8)
     .map((d) => d.substring(0, 300))
     .join("\n---\n");
+
+  const takenClause =
+    existingNames.length > 0
+      ? `\n\nAlready-used cluster names (you MUST pick a DIFFERENT name that does not duplicate or trivially rephrase any of these): ${existingNames.join(", ")}`
+      : "";
 
   const res = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -156,6 +162,7 @@ Rules:
 - Lead with the domain, NOT seniority
 - Be specific: "Computer Vision" not "AI", "Revenue Operations" not "Operations"
 - Never start with "Founding" or "Senior"
+- Each cluster MUST have a unique name — no duplicates or near-duplicates${takenClause}
 
 Return JSON with 'name' and 'keywords' (5-8 specific technical skills shared across these jobs). Only return JSON, no markdown.`,
       },
@@ -177,13 +184,19 @@ Return JSON with 'name' and 'keywords' (5-8 specific technical skills shared acr
 
 export async function labelDomainCluster(
   companyNames: string[],
-  companyDescriptions: string[]
+  companyDescriptions: string[],
+  existingNames: string[] = []
 ): Promise<{ name: string; keywords: string[] }> {
   const nameSample = companyNames.slice(0, 20).join(", ");
   const descSample = companyDescriptions
     .slice(0, 10)
     .map((d) => d.substring(0, 300))
     .join("\n---\n");
+
+  const takenClause =
+    existingNames.length > 0
+      ? `\n\nAlready-used cluster names (you MUST pick a DIFFERENT name that does not duplicate or trivially rephrase any of these): ${existingNames.join(", ")}`
+      : "";
 
   const res = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -203,6 +216,7 @@ Rules:
 - Focus on the industry vertical or market
 - Be specific: "Vertical SaaS for Healthcare" not just "SaaS", "Autonomous Vehicles" not just "AI"
 - If the cluster spans multiple related industries, pick the dominant theme
+- Each cluster MUST have a unique name — no duplicates or near-duplicates${takenClause}
 
 Return JSON with 'name' and 'keywords' (5-8 keywords describing the shared technologies, markets, or business models). Only return JSON, no markdown.`,
       },

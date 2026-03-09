@@ -207,7 +207,7 @@ export function OperationsBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 md:left-60 z-40 flex flex-col gap-1 p-2 pointer-events-none">
+    <div className="fixed top-0 left-0 right-0 md:left-60 z-50 flex flex-col gap-1 p-2 pointer-events-none">
       {visible.map((op) => {
         const elapsed = Math.floor((now - op.startedAt) / 1000);
         const isRunning = op.status === "running";
