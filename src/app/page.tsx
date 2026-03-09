@@ -452,7 +452,7 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto">
           <div className="reveal">
             <span className="text-sm font-mono font-semibold text-yc-orange tracking-widest">06</span>
-            <Badge variant="neutral">Coming Soon</Badge>
+            <Badge variant="green">Live</Badge>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
               Founder-facing event dashboard
             </h2>

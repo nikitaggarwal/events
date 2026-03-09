@@ -8,9 +8,9 @@ datasource db {
 }
 
 model Company {
-  id              String   @id @default(cuid())
+  id              String               @id @default(cuid())
   name            String
-  slug            String   @unique
+  slug            String               @unique
   batch           String?
   description     String?
   url             String?
@@ -18,9 +18,10 @@ model Company {
   embedding       Float[]
   jobs            Job[]
   domainClusterId String?
-  domainCluster   Cluster? @relation(fields: [domainClusterId], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  domainCluster   Cluster?             @relation(fields: [domainClusterId], references: [id])
+  interactions    FounderInteraction[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@index([domainClusterId])
 }
@@ -69,21 +70,22 @@ model Cluster {
 }
 
 model Event {
-  id          String      @id @default(cuid())
-  name        String
-  date        DateTime?
-  location    String?
-  description String?
-  clusterId   String?
-  cluster     Cluster?    @relation(fields: [clusterId], references: [id])
-  status      String      @default("draft")
-  candidates  Candidate[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id           String               @id @default(cuid())
+  name         String
+  date         DateTime?
+  location     String?
+  description  String?
+  clusterId    String?
+  cluster      Cluster?             @relation(fields: [clusterId], references: [id])
+  status       String               @default("draft")
+  candidates   Candidate[]
+  interactions FounderInteraction[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 }
 
 model Candidate {
-  id           String   @id @default(cuid())
+  id           String               @id @default(cuid())
   name         String
   title        String?
   company      String?
@@ -95,9 +97,30 @@ model Candidate {
   fitScore     Float?
   fitReason    String?
   source       String?
-  inviteStatus String   @default("not_contacted")
+  inviteStatus String               @default("not_contacted")
   eventId      String?
-  event        Event?   @relation(fields: [eventId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  event        Event?               @relation(fields: [eventId], references: [id])
+  interactions FounderInteraction[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+}
+
+model FounderInteraction {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  starred     Boolean   @default(false)
+  spoke       Boolean   @default(false)
+  rating      Int?
+  notes       String?
+  followUp    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([candidateId, companyId, eventId])
+  @@index([eventId, companyId])
 }

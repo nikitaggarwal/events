@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, use } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { useOperations } from "@/lib/operations";
@@ -232,13 +233,21 @@ export default function EventDetailPage({
             </div>
           </div>
           {event.cluster ? (
-            <button
-              onClick={sourceCandidates}
-              disabled={sourcing}
-              className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-            >
-              {sourcing ? "Sourcing..." : "Source Candidates via Exa"}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <button
+                onClick={sourceCandidates}
+                disabled={sourcing}
+                className="px-4 py-2 text-[13px] font-medium bg-yc-orange text-white rounded-md hover:bg-yc-orange-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+              >
+                {sourcing ? "Sourcing..." : "Source Candidates via Exa"}
+              </button>
+              <Link
+                href={`/events/${id}/founder`}
+                className="px-4 py-2 text-[13px] font-medium border border-yc-border text-yc-text rounded-md hover:border-yc-orange/30 hover:text-yc-orange transition-colors text-center w-full sm:w-auto"
+              >
+                Founder View
+              </Link>
+            </div>
           ) : (
             <select
               disabled={relinking}
