@@ -11,15 +11,12 @@ export const maxDuration = 300;
 export async function POST() {
   try {
     const listings = await scrapeWaaSListings();
-    const sfListings = listings.filter(
-      (l) => isSFBayArea(l.location) || !l.location
-    );
 
     let created = 0;
     let skipped = 0;
     let detailed = 0;
 
-    for (const listing of sfListings) {
+    for (const listing of listings) {
       const existing = await prisma.job.findUnique({
         where: { sourceUrl: listing.jobUrl },
       });
@@ -28,38 +25,44 @@ export async function POST() {
         continue;
       }
 
+      const detail = await scrapeJobDetail(listing.jobUrl);
+      if (detail) detailed++;
+
+      const location = detail?.location || listing.location;
+      if (location && !isSFBayArea(location)) {
+        skipped++;
+        continue;
+      }
+
+      const companySlug = detail?.companySlug || listing.companySlug;
+      const companyName =
+        detail?.companyName || listing.companyName || companySlug;
+
       let company = await prisma.company.findUnique({
-        where: { slug: listing.companySlug },
+        where: { slug: companySlug },
       });
       if (!company) {
         company = await prisma.company.create({
           data: {
-            name: listing.companyName,
-            slug: listing.companySlug,
-            batch: listing.batch,
-            description: listing.companyDescription,
-            url: `https://www.ycombinator.com/companies/${listing.companySlug}`,
+            name: companyName,
+            slug: companySlug,
+            batch: detail?.batch || listing.batch,
+            description: detail?.companyDescription || listing.companyDescription,
+            url: `https://www.ycombinator.com/companies/${companySlug}`,
           },
         });
-      }
-
-      let detail = await scrapeJobDetail(listing.jobUrl);
-      if (detail) detailed++;
-
-      const isSF = detail?.location
-        ? isSFBayArea(detail.location)
-        : isSFBayArea(listing.location);
-
-      if (detail?.location && !isSF && listing.location && !isSFBayArea(listing.location)) {
-        skipped++;
-        continue;
+      } else if (!company.name && companyName) {
+        company = await prisma.company.update({
+          where: { slug: companySlug },
+          data: { name: companyName },
+        });
       }
 
       await prisma.job.create({
         data: {
           title: detail?.title || listing.title,
           slug: listing.jobUrl.split("/").pop() || null,
-          location: detail?.location || listing.location,
+          location,
           jobType: detail?.jobType || listing.jobType,
           role: detail?.role || listing.role,
           experience: detail?.experience,
@@ -68,7 +71,7 @@ export async function POST() {
           equity: detail?.equity,
           visa: detail?.visa,
           skills: detail?.skills || [],
-          description: detail?.description,
+          description: detail?.description || "",
           sourceUrl: listing.jobUrl,
           postedAt: listing.postedAt,
           companyId: company.id,
@@ -77,13 +80,12 @@ export async function POST() {
       });
       created++;
 
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 400));
     }
 
     return NextResponse.json({
       success: true,
       total: listings.length,
-      sfFiltered: sfListings.length,
       created,
       skipped,
       detailed,

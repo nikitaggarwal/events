@@ -15,7 +15,6 @@ export interface ScrapedJob {
 
 export interface JobDetail {
   title: string;
-  salary: string | null;
   salaryMin: number | null;
   salaryMax: number | null;
   equity: string | null;
@@ -25,18 +24,16 @@ export interface JobDetail {
   experience: string | null;
   visa: string | null;
   skills: string[];
-  description: string | null;
+  description: string;
   companyName: string;
   companySlug: string;
   batch: string | null;
   companyDescription: string | null;
-  companyUrl: string | null;
   founded: string | null;
   teamSize: string | null;
-  status: string | null;
 }
 
-const SF_LOCATIONS = [
+const SF_KEYWORDS = [
   "san francisco",
   "sf",
   "bay area",
@@ -51,14 +48,14 @@ const SF_LOCATIONS = [
   "santa clara",
   "south san francisco",
   "san mateo",
-  "fremont",
   "cupertino",
+  "dogpatch",
 ];
 
 export function isSFBayArea(location: string | null): boolean {
   if (!location) return false;
   const lower = location.toLowerCase();
-  return SF_LOCATIONS.some((sf) => lower.includes(sf));
+  return SF_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 export async function scrapeWaaSListings(): Promise<ScrapedJob[]> {
@@ -74,8 +71,8 @@ export async function scrapeWaaSListings(): Promise<ScrapedJob[]> {
 
   const allJobs: ScrapedJob[] = [];
 
-  for (const role of roles) {
-    const url = `https://www.workatastartup.com/jobs/l/${role}`;
+  for (const roleSlug of roles) {
+    const url = `https://www.workatastartup.com/jobs/l/${roleSlug}`;
     const res = await fetch(url, {
       headers: {
         "User-Agent":
@@ -85,91 +82,57 @@ export async function scrapeWaaSListings(): Promise<ScrapedJob[]> {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    $("a[href*='/companies/']").each((_, companyLink) => {
-      const companyHref = $(companyLink).attr("href") || "";
-      const companyText = $(companyLink).text().trim();
-
-      const batchMatch = companyText.match(/\(([A-Z]\d{2})\)/);
-      const batch = batchMatch ? batchMatch[1] : null;
-
-      const descMatch = companyText.match(/•\s*(.+)$/);
-      const companyDescription = descMatch ? descMatch[1].trim() : null;
-
-      const nameMatch = companyText.match(/^([^(•]+)/);
-      const companyName = nameMatch ? nameMatch[1].trim() : companyText;
-
-      const slugMatch = companyHref.match(/\/companies\/([^/]+)/);
-      const companySlug = slugMatch ? slugMatch[1] : "";
-
-      const postedMatch = companyText.match(/\((\d+\s+\w+\s+ago|about\s+.+ago)\)/i);
-      const postedAt = postedMatch ? postedMatch[1] : null;
-
-      const nextJobLink = $(companyLink)
-        .parent()
-        .find('a[href*="/jobs/"]')
-        .first();
-      if (nextJobLink.length === 0) return;
-
-      const jobHref = nextJobLink.attr("href") || "";
-      const jobTitle = nextJobLink.text().trim();
-
-      const parentBlock = $(companyLink).parent();
-      const blockText = parentBlock.text();
-      const locationMatch = blockText.match(
-        /((?:San Francisco|SF|Remote|Mountain View|Palo Alto|Menlo Park|Oakland|San Jose|Santa Clara|Redwood City|Berkeley)[^,\n]*)(?:,\s*[A-Z]{2}(?:,\s*US)?)?/i
-      );
-      const location = locationMatch ? locationMatch[1].trim() : null;
-
-      const isFulltime = blockText.toLowerCase().includes("fulltime");
-      const isIntern = blockText.toLowerCase().includes("intern");
-      const jobType = isIntern ? "intern" : isFulltime ? "fulltime" : null;
-
-      const rolePatterns = [
-        "Backend",
-        "Frontend",
-        "Full stack",
-        "Engineering manager",
-        "DevOps",
-        "QA engineer",
-        "Robotics",
-        "Embedded systems",
-        "Data science",
-        "Machine learning",
-      ];
-      let jobRole: string | null = null;
-      for (const rp of rolePatterns) {
-        if (blockText.includes(rp)) {
-          jobRole = rp;
-          break;
-        }
+    const jobLinks: string[] = [];
+    $('a[href*="/companies/"][href*="/jobs/"]').each((_, el) => {
+      const href = $(el).attr("href");
+      if (href && href.includes("ycombinator.com")) {
+        jobLinks.push(href);
       }
+    });
+
+    for (const jobUrl of jobLinks) {
+      const slugMatch = jobUrl.match(
+        /\/companies\/([^/]+)\/jobs\/([^/]+)/
+      );
+      if (!slugMatch) continue;
+
+      const companySlug = slugMatch[1];
+      const jobSlugFull = slugMatch[2];
+      const titleFromSlug = jobSlugFull
+        .replace(/^[a-zA-Z0-9]+-/, "")
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      const linkEl = $(`a[href="${jobUrl}"], a[href$="${jobUrl.split("ycombinator.com")[1]}"]`);
+      const jobTitle = linkEl.text().trim() || titleFromSlug;
 
       allJobs.push({
         title: jobTitle,
-        companyName,
+        companyName: "",
         companySlug,
-        batch,
-        companyDescription,
-        jobUrl: jobHref.startsWith("http")
-          ? jobHref
-          : `https://www.ycombinator.com${jobHref}`,
-        location,
-        jobType,
-        role: jobRole,
-        postedAt,
+        batch: null,
+        companyDescription: null,
+        jobUrl: jobUrl.startsWith("http")
+          ? jobUrl
+          : `https://www.ycombinator.com${jobUrl}`,
+        location: null,
+        jobType: null,
+        role: roleSlug.replace(/-/g, " "),
+        postedAt: null,
       });
-    });
+    }
   }
 
-  const uniqueJobs = allJobs.filter(
-    (job, index, self) =>
-      self.findIndex((j) => j.jobUrl === job.jobUrl) === index
+  const unique = allJobs.filter(
+    (job, i, arr) => arr.findIndex((j) => j.jobUrl === job.jobUrl) === i
   );
 
-  return uniqueJobs;
+  return unique;
 }
 
-export async function scrapeJobDetail(jobUrl: string): Promise<JobDetail | null> {
+export async function scrapeJobDetail(
+  jobUrl: string
+): Promise<JobDetail | null> {
   try {
     const res = await fetch(jobUrl, {
       headers: {
@@ -180,124 +143,112 @@ export async function scrapeJobDetail(jobUrl: string): Promise<JobDetail | null>
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    const title = $("h1").first().text().trim();
+    const title = $("h1").first().text().trim() || "";
 
-    const salaryText = $("body").text();
-    const salaryMatch = salaryText.match(
-      /\$(\d{1,3}(?:,\d{3})*K?)\s*-\s*\$(\d{1,3}(?:,\d{3})*K?)/
-    );
+    const pageText = $("body").text();
+
+    const companyH2 = $("h2").first().text().trim();
+    const companyName = companyH2 || "";
+
+    const slugMatch = jobUrl.match(/\/companies\/([^/]+)/);
+    const companySlug = slugMatch ? slugMatch[1] : "";
+
     let salaryMin: number | null = null;
     let salaryMax: number | null = null;
-    let salary: string | null = null;
+    let equity: string | null = null;
+    const salaryMatch = pageText.match(
+      /\$(\d{1,3}(?:,\d{3})*K?)\s*-\s*\$(\d{1,3}(?:,\d{3})*K?)/
+    );
     if (salaryMatch) {
-      salary = salaryMatch[0];
-      const parseK = (s: string) => {
-        const num = parseInt(s.replace(/[,$K]/g, ""));
-        return s.includes("K") ? num * 1000 : num;
+      const parse = (s: string) => {
+        const n = parseInt(s.replace(/[,$K]/g, ""));
+        return s.includes("K") ? n * 1000 : n < 1000 ? n * 1000 : n;
       };
-      salaryMin = parseK(salaryMatch[1]);
-      salaryMax = parseK(salaryMatch[2]);
-      if (salaryMin < 1000) salaryMin *= 1000;
-      if (salaryMax < 1000) salaryMax *= 1000;
+      salaryMin = parse(salaryMatch[1]);
+      salaryMax = parse(salaryMatch[2]);
+    }
+    const equityMatch = pageText.match(/(\d+\.?\d*%\s*-\s*\d+\.?\d*%)/);
+    if (equityMatch) equity = equityMatch[1];
+
+    const fieldPatterns: Record<string, RegExp> = {
+      jobType: /Job\s*type\s*\n?\s*(Full-time|Part-time|Contract|Intern(?:ship)?)/i,
+      role: /Role\s*\n?\s*([\w\s,/&]+?)(?=\s*Experience|\s*Visa|\s*Skills|\s*Connect)/i,
+      experience: /Experience\s*\n?\s*([\w+\s()]+?)(?=\s*Visa|\s*Skills|\s*Connect)/i,
+      visa: /Visa\s*\n?\s*([\w\s/;]+?)(?=\s*Skills|\s*Connect)/i,
+    };
+
+    const fields: Record<string, string | null> = {};
+    for (const [key, regex] of Object.entries(fieldPatterns)) {
+      const m = pageText.match(regex);
+      fields[key] = m ? m[1].trim() : null;
     }
 
-    const equityMatch = salaryText.match(
-      /(\d+\.?\d*%\s*-\s*\d+\.?\d*%)/
+    let location: string | null = null;
+    const locMatch = pageText.match(
+      /\$[\d,KM]+.*?[•·]\s*([\w\s,./()-]+?)(?=\s*Job\s*type)/i
     );
-    const equity = equityMatch ? equityMatch[1] : null;
-
-    const companyNameEl = $('a[href*="/companies/"] h2, [class*="company"] h2').first();
-    const companyName = companyNameEl.text().trim() || $("h2").first().text().trim();
-
-    const companyLinkEl = $('a[href*="/companies/"]').first();
-    const companyHref = companyLinkEl.attr("href") || "";
-    const companySlugMatch = companyHref.match(/\/companies\/([^/]+)/);
-    const companySlug = companySlugMatch ? companySlugMatch[1] : "";
+    if (locMatch) {
+      location = locMatch[1].trim();
+    }
+    if (!location) {
+      const locMatch2 = pageText.match(
+        /Location\s*\n?\s*([\w\s,./()-]+?)(?=\s*Founders|\s*Similar)/i
+      );
+      if (locMatch2) location = locMatch2[1].trim();
+    }
+    if (location && location.length > 80) location = location.substring(0, 80);
 
     const skills: string[] = [];
-    const skillsSection = $("body").text();
-    const skillsMatch = skillsSection.match(/Skills\s+([\s\S]*?)(?=Connect|Apply|About)/);
+    const skillsMatch = pageText.match(
+      /Skills\s*\n?\s*([\s\S]*?)(?=Connect directly|Apply to role)/i
+    );
     if (skillsMatch) {
       skillsMatch[1]
-        .split(/,|\n/)
+        .split(/[,\n]/)
         .map((s) => s.trim())
-        .filter((s) => s.length > 0 && s.length < 50)
+        .filter((s) => s.length > 1 && s.length < 50 && !s.includes("http"))
         .forEach((s) => skills.push(s));
     }
 
     let description = "";
-    $("h3").each((_, heading) => {
-      const headingText = $(heading).text().trim().toLowerCase();
-      if (
-        headingText.includes("about") ||
-        headingText.includes("what you") ||
-        headingText.includes("your background") ||
-        headingText.includes("strong candidate")
-      ) {
-        const section = $(heading).parent();
-        description += section.text().trim() + "\n\n";
-      }
-    });
-    if (!description) {
-      description = $("main").text().trim().substring(0, 3000);
-    }
-
-    const locationEl = $("body").text();
-    const locationMatch = locationEl.match(
-      /(San Francisco[^•\n]*|Mountain View[^•\n]*|Palo Alto[^•\n]*|Remote[^•\n]*)/i
+    const aboutRole = pageText.match(
+      /About the role\s*([\s\S]*?)(?=About\s+\w+\s*\n|Similar Jobs|Founders)/i
     );
-    const location = locationMatch ? locationMatch[1].trim() : null;
+    if (aboutRole) {
+      description = aboutRole[1].trim();
+    } else {
+      const whatYoull = pageText.match(
+        /(What you['']ll do|What You['']ll Do|Responsibilities)\s*([\s\S]*?)(?=About\s+\w+\s*\n|Similar Jobs|Founders)/i
+      );
+      if (whatYoull) description = whatYoull[0].trim();
+    }
+    if (description.length > 5000)
+      description = description.substring(0, 5000);
 
-    const jobTypeMatch = locationEl.match(/(Full-time|Part-time|Contract|Intern)/i);
-    const jobType = jobTypeMatch ? jobTypeMatch[1] : null;
+    const batchMatch = pageText.match(/Batch:?\s*([A-Z]\d{2})/);
+    const foundedMatch = pageText.match(/Founded:?\s*(\d{4})/);
+    const teamMatch = pageText.match(/Team Size:?\s*(\d+)/);
 
-    const roleMatch = locationEl.match(/Role\s+([\w\s,]+?)(?=\n|Experience)/);
-    const role = roleMatch ? roleMatch[1].trim() : null;
-
-    const expMatch = locationEl.match(/Experience\s+([\w+\s]+years?)/i);
-    const experience = expMatch ? expMatch[1].trim() : null;
-
-    const visaMatch = locationEl.match(/Visa\s+([\w\s/]+?)(?=\n|Skills)/);
-    const visa = visaMatch ? visaMatch[1].trim() : null;
-
-    const batchMatch = locationEl.match(/Batch:?\s*([A-Z]\d{2})/);
-    const batch = batchMatch ? batchMatch[1] : null;
-
-    const foundedMatch = locationEl.match(/Founded:?\s*(\d{4})/);
-    const founded = foundedMatch ? foundedMatch[1] : null;
-
-    const teamMatch = locationEl.match(/Team Size:?\s*(\d+)/);
-    const teamSize = teamMatch ? teamMatch[1] : null;
-
-    const statusMatch = locationEl.match(/Status:?\s*(\w+)/);
-    const status = statusMatch ? statusMatch[1] : null;
-
-    const descEl = $('meta[name="description"]').attr("content");
-    const companyDescription = descEl || null;
+    const metaDesc = $('meta[name="description"]').attr("content") || null;
 
     return {
-      title,
-      salary,
+      title: title || "",
       salaryMin,
       salaryMax,
       equity,
       location,
-      jobType,
-      role,
-      experience,
-      visa,
+      jobType: fields.jobType || null,
+      role: fields.role || null,
+      experience: fields.experience || null,
+      visa: fields.visa || null,
       skills,
-      description: description.substring(0, 5000),
+      description,
       companyName,
       companySlug,
-      batch,
-      companyDescription,
-      companyUrl: companySlug
-        ? `https://www.ycombinator.com/companies/${companySlug}`
-        : null,
-      founded,
-      teamSize,
-      status,
+      batch: batchMatch ? batchMatch[1] : null,
+      companyDescription: metaDesc,
+      founded: foundedMatch ? foundedMatch[1] : null,
+      teamSize: teamMatch ? teamMatch[1] : null,
     };
   } catch (err) {
     console.error(`Failed to scrape ${jobUrl}:`, err);
