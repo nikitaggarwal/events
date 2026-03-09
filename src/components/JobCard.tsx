@@ -35,54 +35,53 @@ export function JobCard({
   const salary = formatSalary(salaryMin, salaryMax);
 
   return (
-    <div className="bg-white border border-yc-border rounded-lg p-4 hover:border-yc-orange/30 transition-colors">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-medium text-yc-dark truncate">
-              {title}
-            </h4>
-          </div>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-yc-text-secondary">
-            <span className="font-medium text-yc-text">{companyName}</span>
-            {batch && <Badge variant="orange">{batch}</Badge>}
-          </div>
+    <div className="bg-white border border-yc-border rounded-lg p-4 hover:border-yc-orange/30 transition-colors flex items-center gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-medium text-yc-dark truncate">
+            {title}
+          </h4>
         </div>
-        {sourceUrl && (
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 text-[11px] font-medium text-yc-orange hover:text-yc-orange-hover"
-          >
-            View
-          </a>
+        <div className="mt-0.5 flex items-center gap-2 text-xs text-yc-text-secondary">
+          <span className="font-medium text-yc-text">{companyName}</span>
+          {batch && <Badge variant="orange">{batch}</Badge>}
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
+          {location && <Badge variant="blue">{location}</Badge>}
+          {role && <Badge variant="purple">{role}</Badge>}
+          {salary && <Badge variant="green">{salary}</Badge>}
+          {postedAt && <Badge variant="neutral">{postedAt}</Badge>}
+        </div>
+
+        {skills && skills.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {skills.slice(0, 6).map((skill, i) => (
+              <span
+                key={`${skill}-${i}`}
+                className="text-[10px] text-yc-text-secondary bg-yc-bg px-1.5 py-0.5 rounded"
+              >
+                {skill}
+              </span>
+            ))}
+            {skills.length > 6 && (
+              <span className="text-[10px] text-yc-text-secondary">
+                +{skills.length - 6}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
-        {location && <Badge variant="blue">{location}</Badge>}
-        {role && <Badge variant="purple">{role}</Badge>}
-        {salary && <Badge variant="green">{salary}</Badge>}
-        {postedAt && <Badge variant="neutral">{postedAt}</Badge>}
-      </div>
-
-      {skills && skills.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {skills.slice(0, 6).map((skill, i) => (
-            <span
-              key={`${skill}-${i}`}
-              className="text-[10px] text-yc-text-secondary bg-yc-bg px-1.5 py-0.5 rounded"
-            >
-              {skill}
-            </span>
-          ))}
-          {skills.length > 6 && (
-            <span className="text-[10px] text-yc-text-secondary">
-              +{skills.length - 6}
-            </span>
-          )}
-        </div>
+      {sourceUrl && (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 px-3 py-1.5 text-[12px] font-medium text-white bg-yc-orange rounded-md hover:bg-yc-orange-hover transition-colors"
+        >
+          View Role →
+        </a>
       )}
     </div>
   );
