@@ -116,7 +116,7 @@ export default function LandingPage() {
       <div className="text-center px-6 pt-16 pb-8">
         <div className="reveal">
           <h2 className="text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">How it works</h2>
-          <p className="mt-2 text-base text-yc-text-secondary">Seven steps from raw job data to measurable hiring outcomes.</p>
+          <p className="mt-2 text-base text-yc-text-secondary">Eight steps from raw job data to measurable hiring outcomes.</p>
           <button
             onClick={() => setDetailed(!detailed)}
             className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-yc-border text-[12px] text-yc-text-secondary hover:text-yc-dark hover:border-yc-text-secondary/30 transition-colors"
@@ -203,38 +203,40 @@ export default function LandingPage() {
             />
           </div>
 
-          {/* Clustering visualization */}
-          <div className="reveal reveal-delay-1 mt-10 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 max-w-xl">
-            <div className="flex-1 w-full bg-yc-bg border border-yc-border rounded-lg px-3 py-3">
-              <div className="text-[10px] font-medium text-yc-text-secondary uppercase tracking-wider mb-2">Ungrouped</div>
-              <div className="flex flex-wrap gap-1">
-                {["SRE", "ML Eng", "Backend", "DevOps", "Data Eng", "Infra", "PM", "Designer", "Security"].map((t) => (
-                  <span key={t} className="text-[10px] px-1.5 py-0.5 bg-white border border-yc-border rounded text-yc-text-secondary">{t}</span>
-                ))}
+          {/* Clustering visualization — two modes */}
+          <div className="reveal reveal-delay-1 mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+            <div className="bg-yc-bg border border-yc-border rounded-lg p-3">
+              <div className="text-[10px] font-medium text-yc-orange uppercase tracking-wider mb-2">By Role</div>
+              <div className="space-y-1.5">
+                <div className="bg-yc-orange-light border border-yc-orange/20 rounded px-2.5 py-1.5 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-yc-orange">Infra & DevTools</span>
+                  <span className="text-[10px] text-yc-text-secondary">SRE, DevOps, Infra</span>
+                </div>
+                <div className="bg-yc-blue-light border border-yc-blue/20 rounded px-2.5 py-1.5 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-yc-blue">ML & Data</span>
+                  <span className="text-[10px] text-yc-text-secondary">ML Eng, Data Eng</span>
+                </div>
+                <div className="bg-yc-purple-light border border-yc-purple/20 rounded px-2.5 py-1.5 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-yc-purple">Product & Design</span>
+                  <span className="text-[10px] text-yc-text-secondary">PM, Designer</span>
+                </div>
               </div>
             </div>
-            <div className="text-yc-text-secondary/50 hidden sm:block shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div className="sm:hidden text-yc-text-secondary/50">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5v14M6 13l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div className="flex-1 w-full space-y-1.5">
-              <div className="bg-yc-orange-light border border-yc-orange/20 rounded px-3 py-1.5 flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-yc-orange">Infra & DevTools</span>
-                <span className="text-[10px] text-yc-text-secondary">SRE, DevOps, Infra</span>
-              </div>
-              <div className="bg-yc-blue-light border border-yc-blue/20 rounded px-3 py-1.5 flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-yc-blue">ML & Data</span>
-                <span className="text-[10px] text-yc-text-secondary">ML Eng, Data Eng</span>
-              </div>
-              <div className="bg-yc-purple-light border border-yc-purple/20 rounded px-3 py-1.5 flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-yc-purple">Product & Design</span>
-                <span className="text-[10px] text-yc-text-secondary">PM, Designer</span>
+            <div className="bg-yc-bg border border-yc-border rounded-lg p-3">
+              <div className="text-[10px] font-medium text-yc-blue uppercase tracking-wider mb-2">By Company Domain</div>
+              <div className="space-y-1.5">
+                <div className="bg-yc-blue-light border border-yc-blue/20 rounded px-2.5 py-1.5 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-yc-blue">FinTech</span>
+                  <span className="text-[10px] text-yc-text-secondary">8 companies</span>
+                </div>
+                <div className="bg-yc-green-light border border-yc-green/20 rounded px-2.5 py-1.5 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-yc-green">Developer Tools</span>
+                  <span className="text-[10px] text-yc-text-secondary">12 companies</span>
+                </div>
+                <div className="bg-yc-purple-light border border-yc-purple/20 rounded px-2.5 py-1.5 flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-yc-purple">Healthcare AI</span>
+                  <span className="text-[10px] text-yc-text-secondary">5 companies</span>
+                </div>
               </div>
             </div>
           </div>
@@ -615,8 +617,55 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
+      {/* ── Step 08: Customizable Clustering ── */}
       <section className="py-20 sm:py-24 px-6 bg-white">
+        <div className="max-w-3xl mx-auto">
+          <div className="reveal">
+            <span className="text-sm font-mono font-semibold text-yc-orange tracking-widest">08</span>
+            <Badge variant="neutral">Coming Soon</Badge>
+            <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
+              Customizable clustering
+            </h2>
+            <Desc
+              short="Ops can mix clustering dimensions to design events that go beyond role type — targeting founder needs, candidate fit, and timing."
+              long="This lets the team experiment with event formats. Cluster by YC batch to target the freshest cohorts, by funding stage to match candidate risk appetite, or by hiring velocity to prioritize the companies scaling fastest."
+              detailed={detailed}
+            />
+          </div>
+
+          <div className="reveal reveal-delay-1 mt-10 max-w-lg">
+            <div className="bg-yc-bg border border-yc-border rounded-xl p-5">
+              <div className="text-[11px] font-medium text-yc-text-secondary uppercase tracking-wider mb-4">Clustering strategy</div>
+              <div className="space-y-3">
+                {[
+                  { label: "By Role Type", desc: "SRE, Backend, ML Engineer, Designer…", active: true },
+                  { label: "By Company Domain", desc: "FinTech, DevTools, Healthcare AI…", active: true },
+                  { label: "By YC Batch", desc: "W25, S24, W24 — group the freshest cohorts together", active: false },
+                  { label: "By Funding Stage", desc: "Seed vs. Series A vs. B+ — match candidate risk appetite", active: false },
+                  { label: "By Hiring Velocity", desc: "Companies that posted 5+ roles in the last 30 days", active: false },
+                  { label: "By Founder Background", desc: "Technical founders, repeat founders, solo founders", active: false },
+                  { label: "By Candidate Overlap", desc: "Roles attracting the same applicants on WaaS", active: false },
+                  { label: "By Event Format", desc: "Hackathon-ready, panel-friendly, speed-interview fit", active: false },
+                  { label: "Custom Combo", desc: "e.g. Series A FinTech companies hiring senior ML engineers", active: false },
+                ].map((s) => (
+                  <div key={s.label} className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-yc-dark">{s.label}</div>
+                      <div className="text-[11px] text-yc-text-secondary">{s.desc}</div>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full flex items-center px-0.5 shrink-0 ml-3 transition-colors ${s.active ? "bg-yc-orange justify-end" : "bg-yc-border justify-start"}`}>
+                      <div className="w-4 h-4 bg-white rounded-full shadow-sm" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <section className="py-20 sm:py-24 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <div className="reveal">
             <Link
