@@ -7,24 +7,10 @@ import { fetcher } from "@/lib/swr";
 import { useScrollReveal } from "@/lib/useScrollReveal";
 import { Badge } from "@/components/Badge";
 
-function ExpandableText({ short, long }: { short: string; long: string }) {
-  const [open, setOpen] = useState(false);
+function Desc({ short, long, detailed }: { short: string; long: string; detailed: boolean }) {
   return (
     <p className="mt-4 text-base sm:text-lg text-yc-text-secondary leading-relaxed max-w-2xl">
-      {short}
-      {!open && (
-        <button onClick={() => setOpen(true)} className="ml-1 text-yc-text-secondary/60 hover:text-yc-text-secondary text-sm">
-          ...more
-        </button>
-      )}
-      {open && (
-        <>
-          {" "}{long}
-          <button onClick={() => setOpen(false)} className="ml-1 text-yc-text-secondary/60 hover:text-yc-text-secondary text-sm">
-            less
-          </button>
-        </>
-      )}
+      {detailed ? `${short} ${long}` : short}
     </p>
   );
 }
@@ -64,6 +50,7 @@ export default function LandingPage() {
   useScrollReveal();
 
   const jobs = jobsData?.jobs || [];
+  const [detailed, setDetailed] = useState(false);
 
   return (
     <div className="min-h-screen">
@@ -129,7 +116,14 @@ export default function LandingPage() {
       <div className="text-center px-6 pt-16 pb-8">
         <div className="reveal">
           <h2 className="text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">How it works</h2>
-          <p className="mt-2 text-base text-yc-text-secondary">Six steps from raw job data to a fully staffed event.</p>
+          <p className="mt-2 text-base text-yc-text-secondary">Seven steps from raw job data to measurable hiring outcomes.</p>
+          <button
+            onClick={() => setDetailed(!detailed)}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-yc-border text-[12px] text-yc-text-secondary hover:text-yc-dark hover:border-yc-text-secondary/30 transition-colors"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full transition-colors ${detailed ? "bg-yc-orange" : "bg-yc-border"}`} />
+            {detailed ? "Detailed" : "Brief"}
+          </button>
         </div>
       </div>
 
@@ -141,9 +135,10 @@ export default function LandingPage() {
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
               Scrape job listings
             </h2>
-            <ExpandableText
+            <Desc
               short="Pulls every SF Bay Area job listing from WaaS and the YC company directory, then deduplicates and stores them."
               long="It captures titles, companies, locations, salary ranges, and skills for each listing. Both sources are scraped in parallel and merged into a single dataset."
+              detailed={detailed}
             />
           </div>
 
@@ -201,9 +196,10 @@ export default function LandingPage() {
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
               Cluster into event themes
             </h2>
-            <ExpandableText
+            <Desc
               short="Jobs are embedded via OpenAI and grouped with K-Means clustering, producing focused event themes."
               long="Each theme ensures every attendee is relevant to every company at the event. Clustering can also be run by company domain to group by industry vertical instead of role type."
+              detailed={detailed}
             />
           </div>
 
@@ -269,9 +265,10 @@ export default function LandingPage() {
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
               Create events from clusters
             </h2>
-            <ExpandableText
+            <Desc
               short="Any cluster becomes a hiring event with one click, inheriting its theme, companies, and open roles."
               long="Each event tracks name, date, location, and status (draft, planning, active, completed). The linked cluster gives it a clear focus from the start."
+              detailed={detailed}
             />
           </div>
 
@@ -305,39 +302,73 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Step 04: Source Candidates ── */}
+      {/* ── Step 04: Source Candidates & Pipeline ── */}
       <section className="py-20 sm:py-24 px-6 bg-white">
         <div className="max-w-3xl mx-auto">
           <div className="reveal">
             <span className="text-sm font-mono font-semibold text-yc-orange tracking-widest">04</span>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
-              Source candidates
+              Source candidates & build the pipeline
             </h2>
-            <ExpandableText
-              short="Candidates are sourced via Exa's semantic search, matching people to the event's theme and roles."
-              long="In production, this would also pull from WaaS applicants who applied to matching jobs and Luma RSVPs from related tech events — layering multiple candidate sources."
+            <Desc
+              short="Candidates are pulled from multiple channels and tracked through a pipeline — sourced, contacted, RSVP'd, attended."
+              long="In production, sourcing layers Exa semantic search with WaaS applicants who applied to matching roles and Luma RSVPs from related tech events."
+              detailed={detailed}
             />
           </div>
 
-          <div className="reveal reveal-delay-1 mt-10 bg-yc-bg border border-yc-border rounded-xl p-6 max-w-lg">
-            <div className="text-[11px] font-medium text-yc-text-secondary uppercase tracking-wider mb-3">
-              Sourced Candidates
-            </div>
-            <div className="space-y-3">
+          {/* Sourcing channels */}
+          <div className="reveal reveal-delay-1 mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl">
+            {[
+              { channel: "WaaS Applicants", desc: "Applied to Senior Backend Eng, SRE Lead, +12 more", count: 48, badge: "orange" as const },
+              { channel: "Luma RSVPs", desc: "SF Infra Meetup, DevTools Demo Day, +3 events", count: 31, badge: "purple" as const },
+              { channel: "Exa Search", desc: "Semantic match to event theme & roles", count: 26, badge: "neutral" as const },
+            ].map((s) => (
+              <div key={s.channel} className="bg-yc-bg border border-yc-border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <Badge variant={s.badge}>{s.channel}</Badge>
+                  <span className="text-lg font-semibold text-yc-dark">{s.count}</span>
+                </div>
+                <div className="text-[11px] text-yc-text-secondary leading-relaxed">{s.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Sample candidates with sources */}
+          <div className="reveal reveal-delay-2 mt-4 space-y-2 max-w-xl">
+            {[
+              { name: "Sarah Chen", title: "Staff SRE at Stripe", source: "Applied to SRE Lead", badge: "orange" as const },
+              { name: "James Liu", title: "Infra Eng at Vercel", source: "Luma: SF Infra Meetup", badge: "purple" as const },
+              { name: "Marcus Rivera", title: "Platform Eng at Datadog", source: "Exa", badge: "neutral" as const },
+              { name: "Priya Patel", title: "Infra Lead at Figma", source: "Applied to Infra Eng", badge: "orange" as const },
+            ].map((c) => (
+              <div key={c.name} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-yc-border">
+                <div className="w-8 h-8 bg-yc-orange-light rounded-full flex items-center justify-center text-xs font-bold text-yc-orange shrink-0">
+                  {c.name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-yc-dark">{c.name}</div>
+                  <div className="text-xs text-yc-text-secondary">{c.title}</div>
+                </div>
+                <Badge variant={c.badge}>{c.source}</Badge>
+              </div>
+            ))}
+          </div>
+
+          {/* Pipeline summary */}
+          <div className="reveal reveal-delay-3 mt-6 max-w-xl">
+            <div className="flex items-center gap-2">
               {[
-                { name: "Sarah Chen", title: "Staff SRE at Stripe", source: "Exa" },
-                { name: "Marcus Rivera", title: "Platform Eng at Datadog", source: "Exa" },
-                { name: "Priya Patel", title: "Infra Lead at Figma", source: "Exa" },
-              ].map((c) => (
-                <div key={c.name} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-yc-border">
-                  <div className="w-8 h-8 bg-yc-orange-light rounded-full flex items-center justify-center text-xs font-bold text-yc-orange shrink-0">
-                    {c.name[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-yc-dark">{c.name}</div>
-                    <div className="text-xs text-yc-text-secondary">{c.title}</div>
-                  </div>
-                  <Badge variant="neutral">{c.source}</Badge>
+                { label: "Sourced", value: 105, color: "bg-yc-dark text-white" },
+                { label: "Contacted", value: 72, color: "bg-yc-blue text-white" },
+                { label: "RSVP'd", value: 38, color: "bg-yc-green text-white" },
+                { label: "Attended", value: 28, color: "bg-yc-orange text-white" },
+              ].map((s, i) => (
+                <div key={s.label} className="flex items-center gap-1.5">
+                  {i > 0 && <span className="text-yc-text-secondary/40 text-xs">→</span>}
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${s.color}`}>
+                    {s.value} {s.label}
+                  </span>
                 </div>
               ))}
             </div>
@@ -345,66 +376,88 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Step 05: Event Management ── */}
+      {/* ── Step 05: Outreach & Tracking ── */}
       <section className="py-20 sm:py-24 px-6">
         <div className="max-w-3xl mx-auto">
           <div className="reveal">
             <span className="text-sm font-mono font-semibold text-yc-orange tracking-widest">05</span>
+            <Badge variant="neutral">Coming Soon</Badge>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
-              Manage the pipeline
+              Outreach & tracking
             </h2>
-            <ExpandableText
-              short="Each event tracks a full pipeline — sourced, contacted, RSVP'd, attended — with conversion visible at a glance."
-              long="Every candidate's status is tracked individually so the ops team always knows exactly who's coming and can follow up as needed."
+            <Desc
+              short="Automated outreach to both candidates and founders, with every touchpoint tracked in the console."
+              long="Candidates receive personalized invites referencing the roles they matched with, while founders get a brief with confirmed attendees relevant to their open roles. All responses — opens, RSVPs, declines — are logged automatically."
+              detailed={detailed}
             />
           </div>
 
-          <div className="reveal reveal-delay-1 mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg">
-            {[
-              { label: "Sourced", value: 24, color: "text-yc-dark" },
-              { label: "Contacted", value: 18, color: "text-yc-blue" },
-              { label: "RSVP", value: 12, color: "text-yc-green" },
-              { label: "Attended", value: 9, color: "text-yc-orange" },
-            ].map((s) => (
-              <div key={s.label} className="reveal bg-white border border-yc-border rounded-lg p-4 text-center">
-                <div className={`text-2xl font-semibold ${s.color}`}>{s.value}</div>
-                <div className="text-[11px] text-yc-text-secondary mt-0.5">{s.label}</div>
+          <div className="reveal reveal-delay-1 mt-10 space-y-3 max-w-lg">
+            <div className="bg-white border border-yc-border rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-yc-border bg-yc-bg/50">
+                <div className="text-[11px] font-medium text-yc-text-secondary uppercase tracking-wider">Candidate outreach</div>
               </div>
-            ))}
-          </div>
+              <div className="px-5 py-3 space-y-2.5">
+                {[
+                  { name: "Sarah Chen", status: "RSVP'd", statusColor: "text-yc-green", time: "2h ago", method: "Email" },
+                  { name: "James Liu", status: "Opened", statusColor: "text-yc-blue", time: "4h ago", method: "Email" },
+                  { name: "Marcus Rivera", status: "Sent", statusColor: "text-yc-text-secondary", time: "5h ago", method: "LinkedIn" },
+                  { name: "Priya Patel", status: "RSVP'd", statusColor: "text-yc-green", time: "1d ago", method: "Email" },
+                ].map((c, i) => (
+                  <div key={c.name} className={`flex items-center justify-between py-1.5 ${i > 0 ? "border-t border-yc-border/40" : ""}`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 bg-yc-orange-light rounded-full flex items-center justify-center text-[10px] font-bold text-yc-orange shrink-0">
+                        {c.name[0]}
+                      </div>
+                      <span className="text-sm text-yc-dark">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-yc-text-secondary">{c.method}</span>
+                      <span className={`text-[11px] font-medium ${c.statusColor}`}>{c.status}</span>
+                      <span className="text-[10px] text-yc-text-secondary/60 w-10 text-right">{c.time}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div className="reveal reveal-delay-2 mt-6 max-w-lg">
-            <div className="bg-white border border-yc-border rounded-lg p-4">
-              <div className="text-xs text-yc-text-secondary mb-2">Conversion funnel</div>
-              <div className="flex items-center gap-1 h-4 rounded-full overflow-hidden bg-yc-bg">
-                <div className="h-full bg-yc-dark rounded-l-full" style={{ width: "100%" }} />
+            <div className="bg-white border border-yc-border rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-yc-border bg-yc-bg/50">
+                <div className="text-[11px] font-medium text-yc-text-secondary uppercase tracking-wider">Founder outreach</div>
               </div>
-              <div className="flex items-center gap-1 h-4 rounded-full overflow-hidden bg-yc-bg mt-1.5">
-                <div className="h-full bg-yc-blue rounded-l-full" style={{ width: "75%" }} />
-              </div>
-              <div className="flex items-center gap-1 h-4 rounded-full overflow-hidden bg-yc-bg mt-1.5">
-                <div className="h-full bg-yc-green rounded-l-full" style={{ width: "50%" }} />
-              </div>
-              <div className="flex items-center gap-1 h-4 rounded-full overflow-hidden bg-yc-bg mt-1.5">
-                <div className="h-full bg-yc-orange rounded-l-full" style={{ width: "37.5%" }} />
+              <div className="px-5 py-3 space-y-2.5">
+                {[
+                  { company: "NovaSec (W24)", status: "Confirmed", statusColor: "text-yc-green", attendees: "3 relevant candidates" },
+                  { company: "Kubera (S23)", status: "Confirmed", statusColor: "text-yc-green", attendees: "5 relevant candidates" },
+                  { company: "FluxDB (W25)", status: "Pending", statusColor: "text-yc-text-secondary", attendees: "2 relevant candidates" },
+                ].map((f, i) => (
+                  <div key={f.company} className={`flex items-center justify-between py-1.5 ${i > 0 ? "border-t border-yc-border/40" : ""}`}>
+                    <span className="text-sm text-yc-dark">{f.company}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-yc-text-secondary">{f.attendees}</span>
+                      <span className={`text-[11px] font-medium ${f.statusColor}`}>{f.status}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Step 06: Founder View (v2) ── */}
+      {/* ── Step 06: Founder View ── */}
       <section className="py-20 sm:py-24 px-6 bg-white">
         <div className="max-w-3xl mx-auto">
           <div className="reveal">
             <span className="text-sm font-mono font-semibold text-yc-orange tracking-widest">06</span>
-            <Badge variant="neutral">In Production</Badge>
+            <Badge variant="neutral">Coming Soon</Badge>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
               Founder-facing event dashboard
             </h2>
-            <ExpandableText
-              short="In production, founders get their own view — browse matched candidates before the event, log conversations during, and flag follow-ups after."
+            <Desc
+              short="Founders get their own view — browse matched candidates before the event, log conversations during, and flag follow-ups after."
               long="This gives the ops team a full picture of event ROI without chasing founders for feedback. They can see which founders engaged, who they liked, and measure conversations held, follow-ups sent, and hires made."
+              detailed={detailed}
             />
           </div>
 
@@ -413,7 +466,7 @@ export default function LandingPage() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="text-sm font-semibold text-yc-dark">Your Top Candidates</div>
-                <div className="text-[11px] text-yc-text-secondary">Infra &amp; DevTools Hiring Night · 3 matched to your roles</div>
+                <div className="text-[11px] text-yc-text-secondary">Infra &amp; DevTools Hiring Night · 18 matched to your roles</div>
               </div>
               <Badge variant="orange">Founder View</Badge>
             </div>
@@ -488,8 +541,82 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
+      {/* ── Step 07: Post-Event Analytics ── */}
       <section className="py-20 sm:py-24 px-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="reveal">
+            <span className="text-sm font-mono font-semibold text-yc-orange tracking-widest">07</span>
+            <Badge variant="neutral">Coming Soon</Badge>
+            <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-yc-dark tracking-tight">
+              Post-event analytics
+            </h2>
+            <Desc
+              short="In production, ops can compare hiring funnels across events — attendance, interviews, offers, and acceptances."
+              long="This closes the loop on event ROI by measuring what actually matters. Over time, this data helps optimize which event themes and formats drive the most hires."
+              detailed={detailed}
+            />
+          </div>
+
+          <div className="reveal reveal-delay-1 mt-10 overflow-x-auto">
+            <div className="min-w-[480px] max-w-2xl">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-yc-border">
+                    <th className="text-[11px] font-medium text-yc-text-secondary uppercase tracking-wider pb-3 pr-4">Metric</th>
+                    {[
+                      { name: "Infra & DevTools", date: "Apr 10" },
+                      { name: "ML & Data", date: "Mar 20" },
+                      { name: "Product & Design", date: "Mar 6" },
+                    ].map((e) => (
+                      <th key={e.name} className="text-[11px] font-medium text-yc-text-secondary pb-3 px-2 text-center">
+                        <div className="text-yc-dark font-semibold">{e.name}</div>
+                        <div className="font-normal mt-0.5">{e.date}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: "Attended", values: [42, 35, 28], color: "text-yc-dark" },
+                    { label: "→ Interviews", values: [28, 22, 19], color: "text-yc-blue", prevs: [42, 35, 28] },
+                    { label: "→ Offers", values: [9, 6, 8], color: "text-yc-green", prevs: [28, 22, 19] },
+                    { label: "→ Accepted", values: [7, 5, 6], color: "text-yc-orange", prevs: [9, 6, 8] },
+                  ].map((row) => (
+                    <tr key={row.label} className="border-b border-yc-border/50">
+                      <td className="text-xs text-yc-text py-3 pr-4 whitespace-nowrap">{row.label}</td>
+                      {row.values.map((v, i) => (
+                        <td key={i} className="text-center py-3 px-2">
+                          <span className={`text-sm font-semibold ${row.color}`}>{v}</span>
+                          {row.prevs && (
+                            <span className="text-[10px] text-yc-text-secondary ml-1">
+                              {Math.round((v / row.prevs[i]) * 100)}%
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="text-[11px] font-semibold text-yc-text pt-3 pr-4">Hire Rate</td>
+                    {[
+                      { accepted: 7, attended: 42 },
+                      { accepted: 5, attended: 35 },
+                      { accepted: 6, attended: 28 },
+                    ].map((e, i) => (
+                      <td key={i} className="text-center pt-3 px-2">
+                        <span className="text-sm font-bold text-yc-orange">{Math.round((e.accepted / e.attended) * 100)}%</span>
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <section className="py-20 sm:py-24 px-6 bg-white">
         <div className="max-w-3xl mx-auto text-center">
           <div className="reveal">
             <Link
