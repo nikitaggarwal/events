@@ -99,6 +99,7 @@ async function scrapeCompanyJobs(company: YCCompany): Promise<ScrapedJob[]> {
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       },
     });
+    if (!pageRes.ok) return jobs;
     const html = await pageRes.text();
     const $ = cheerio.load(html);
 
@@ -246,6 +247,7 @@ export async function scrapeJobDetail(
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
       },
     });
+    if (!res.ok) return null;
     const html = await res.text();
     const $ = cheerio.load(html);
 

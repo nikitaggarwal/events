@@ -49,11 +49,12 @@ interface JobsResponse {
 
 export default function DemandMap() {
   const { data: stats, mutate: mutateStats } = useSWR<Stats>("/api/stats", fetcher);
-  const { data: clusters, mutate: mutateClusters } = useSWR<ClusterSummary[]>("/api/cluster", fetcher);
+  const { data: clusters, mutate: mutateClusters } = useSWR<ClusterSummary[]>("/api/cluster?type=role", fetcher);
   const { data: jobsData, mutate: mutateJobs } = useSWR<JobsResponse>("/api/scrape?limit=50", fetcher);
 
   const [scraping, setScraping] = useState(false);
   const [clustering, setClustering] = useState(false);
+  const [domainClustering, setDomainClustering] = useState(false);
   const [status, setStatus] = useState("");
   const [showAllThemes, setShowAllThemes] = useState(false);
 
@@ -102,6 +103,32 @@ export default function DemandMap() {
     setClustering(false);
   }
 
+  async function runDomainClustering() {
+    setDomainClustering(true);
+    setStatus("Embedding companies and clustering by domain...");
+    try {
+      const companyCount = stats?.companyCount || 0;
+      const res = await fetch("/api/cluster", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "domain",
+          k: Math.max(5, Math.round(companyCount / 40)),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setStatus(`Domain clustering error: ${data.error}`);
+      } else {
+        setStatus(`Created ${data.clusterCount} domain clusters.`);
+        mutateStats();
+      }
+    } catch (err) {
+      setStatus(`Domain clustering failed: ${err}`);
+    }
+    setDomainClustering(false);
+  }
+
   return (
     <div className="p-8 max-w-[1200px]">
       <div className="flex items-center justify-between mb-8">
@@ -124,7 +151,14 @@ export default function DemandMap() {
             disabled={clustering || totalJobs === 0}
             className="px-4 py-2 text-[13px] font-medium border border-yc-border text-yc-dark rounded-md hover:bg-yc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {clustering ? "Clustering..." : "Run Clustering"}
+            {clustering ? "Clustering..." : "Cluster by Role"}
+          </button>
+          <button
+            onClick={runDomainClustering}
+            disabled={domainClustering || (stats?.companyCount ?? 0) === 0}
+            className="px-4 py-2 text-[13px] font-medium border border-yc-border text-yc-dark rounded-md hover:bg-yc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {domainClustering ? "Clustering..." : "Cluster by Domain"}
           </button>
         </div>
       </div>

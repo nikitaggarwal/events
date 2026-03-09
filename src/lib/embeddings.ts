@@ -174,3 +174,50 @@ Return JSON with 'name' and 'keywords' (5-8 specific technical skills shared acr
     return { name: "Uncategorized", keywords: [] };
   }
 }
+
+export async function labelDomainCluster(
+  companyNames: string[],
+  companyDescriptions: string[]
+): Promise<{ name: string; keywords: string[] }> {
+  const nameSample = companyNames.slice(0, 20).join(", ");
+  const descSample = companyDescriptions
+    .slice(0, 10)
+    .map((d) => d.substring(0, 300))
+    .join("\n---\n");
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You label groups of YC startups by their shared industry or domain. You're given company names and descriptions from a cluster of similar companies.
+
+Your job: name the cluster based on the INDUSTRY VERTICAL or DOMAIN these companies operate in.
+
+Focus on what these companies build or the market they serve:
+Good: "Healthcare & Biotech", "Developer Infrastructure", "Fintech & Payments", "AI/ML Platform", "Supply Chain & Logistics", "Cybersecurity", "Climate & Energy", "Legal Tech", "Construction Tech", "Education", "E-Commerce & Retail", "Real Estate Tech", "Defense & Aerospace", "HR & Recruiting"
+Bad: "YC Startups" (meaningless), "Software Companies" (too generic), "B2B SaaS" (too broad), "Various Tech" (vague)
+
+Rules:
+- 2-4 words max
+- Focus on the industry vertical or market
+- Be specific: "Vertical SaaS for Healthcare" not just "SaaS", "Autonomous Vehicles" not just "AI"
+- If the cluster spans multiple related industries, pick the dominant theme
+
+Return JSON with 'name' and 'keywords' (5-8 keywords describing the shared technologies, markets, or business models). Only return JSON, no markdown.`,
+      },
+      {
+        role: "user",
+        content: `Companies in this cluster:\n${nameSample}\n\nSample descriptions:\n${descSample}`,
+      },
+    ],
+    temperature: 0,
+  });
+
+  try {
+    const content = res.choices[0].message.content || '{"name":"Uncategorized","keywords":[]}';
+    return JSON.parse(content);
+  } catch {
+    return { name: "Uncategorized", keywords: [] };
+  }
+}

@@ -50,15 +50,25 @@ export default function ClustersPage() {
 function ClustersContent() {
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("selected");
+  const [tab, setTab] = useState<"role" | "domain">("role");
   const [selected, setSelected] = useState<string | null>(selectedId);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [showAllCompanies, setShowAllCompanies] = useState(false);
 
-  const { data: clusters } = useSWR<ClusterSummary[]>("/api/cluster", fetcher);
+  const { data: clusters } = useSWR<ClusterSummary[]>(
+    `/api/cluster?type=${tab}`,
+    fetcher
+  );
   const { data: activeCluster } = useSWR<ClusterDetail>(
     selected ? `/api/cluster/${selected}` : null,
     fetcher
   );
+
+  function switchTab(newTab: "role" | "domain") {
+    setTab(newTab);
+    setSelected(null);
+    setShowAllCompanies(false);
+  }
 
   async function createEventFromCluster(cluster: ClusterSummary) {
     setCreatingEvent(true);
@@ -68,7 +78,7 @@ function ClustersContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: `${cluster.name} Hiring Night`,
-          description: `Hiring event focused on ${cluster.name} roles at YC startups. ${cluster.jobCount} open positions across ${cluster.companyCount} companies.`,
+          description: `Hiring event focused on ${cluster.name} ${tab === "role" ? "roles" : "companies"} at YC startups. ${cluster.jobCount} open positions across ${cluster.companyCount} companies.`,
           clusterId: cluster.id,
         }),
       });
@@ -82,11 +92,36 @@ function ClustersContent() {
 
   return (
     <div className="p-8 max-w-[1200px]">
-      <div className="mb-8">
-        <h1 className="text-xl font-semibold text-yc-dark">Role Clusters</h1>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-yc-dark">Clusters</h1>
         <p className="text-sm text-yc-text-secondary mt-1">
-          Job postings grouped by description similarity. Pick a cluster to create an event theme.
+          {tab === "role"
+            ? "Job postings grouped by description similarity. Pick a cluster to create an event theme."
+            : "Companies grouped by industry/domain. Pick a cluster to create an industry-themed event."}
         </p>
+      </div>
+
+      <div className="mb-6 flex gap-1 bg-yc-bg rounded-lg p-1 w-fit">
+        <button
+          onClick={() => switchTab("role")}
+          className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors ${
+            tab === "role"
+              ? "bg-white text-yc-dark shadow-sm"
+              : "text-yc-text-secondary hover:text-yc-dark"
+          }`}
+        >
+          By Role
+        </button>
+        <button
+          onClick={() => switchTab("domain")}
+          className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors ${
+            tab === "domain"
+              ? "bg-white text-yc-dark shadow-sm"
+              : "text-yc-text-secondary hover:text-yc-dark"
+          }`}
+        >
+          By Domain
+        </button>
       </div>
 
       <div className="flex gap-6">

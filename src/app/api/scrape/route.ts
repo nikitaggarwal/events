@@ -24,6 +24,12 @@ async function processJob(listing: ScrapedJob): Promise<"created" | "skipped" | 
       // continue without detail
     }
 
+    const title = detail?.title || listing.title;
+    const BAD_TITLES = ["404", "not found", "page not found", "error", "access denied"];
+    if (!title || title.length < 3 || BAD_TITLES.some((b) => title.toLowerCase().includes(b))) {
+      return "skipped";
+    }
+
     const location = detail?.location || listing.location;
     if (location && !isSFBayArea(location)) return "skipped";
 
