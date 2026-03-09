@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Demand Map", icon: "chart" },
   { href: "/clusters", label: "Clusters", icon: "grid" },
   { href: "/events", label: "Events", icon: "calendar" },
+  { href: "/dashboard", label: "Dashboard", icon: "chart" },
   { href: "/candidates", label: "Candidates", icon: "users" },
 ];
 
@@ -113,10 +113,7 @@ export function Sidebar() {
 
         <nav className="flex-1 py-3">
           {NAV_ITEMS.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+            const isActive = pathname.startsWith(item.href);
 
             return (
               <Link
