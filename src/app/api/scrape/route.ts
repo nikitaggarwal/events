@@ -2,46 +2,40 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   scrapeWaaSListings,
+  scrapeFromYCDirectory,
   scrapeJobDetail,
   isSFBayArea,
+  type ScrapedJob,
 } from "@/lib/scraper";
 
 export const maxDuration = 300;
 
-export async function POST() {
+async function processJob(listing: ScrapedJob): Promise<"created" | "skipped" | "error"> {
   try {
-    const listings = await scrapeWaaSListings();
+    const existing = await prisma.job.findUnique({
+      where: { sourceUrl: listing.jobUrl },
+    });
+    if (existing) return "skipped";
 
-    let created = 0;
-    let skipped = 0;
-    let detailed = 0;
+    let detail = null;
+    try {
+      detail = await scrapeJobDetail(listing.jobUrl);
+    } catch {
+      // continue without detail
+    }
 
-    for (const listing of listings) {
-      const existing = await prisma.job.findUnique({
-        where: { sourceUrl: listing.jobUrl },
-      });
-      if (existing) {
-        skipped++;
-        continue;
-      }
+    const location = detail?.location || listing.location;
+    if (location && !isSFBayArea(location)) return "skipped";
 
-      const detail = await scrapeJobDetail(listing.jobUrl);
-      if (detail) detailed++;
+    const companySlug = detail?.companySlug || listing.companySlug;
+    const companyName =
+      detail?.companyName || listing.companyName || companySlug;
 
-      const location = detail?.location || listing.location;
-      if (location && !isSFBayArea(location)) {
-        skipped++;
-        continue;
-      }
-
-      const companySlug = detail?.companySlug || listing.companySlug;
-      const companyName =
-        detail?.companyName || listing.companyName || companySlug;
-
-      let company = await prisma.company.findUnique({
-        where: { slug: companySlug },
-      });
-      if (!company) {
+    let company = await prisma.company.findUnique({
+      where: { slug: companySlug },
+    });
+    if (!company) {
+      try {
         company = await prisma.company.create({
           data: {
             name: companyName,
@@ -51,44 +45,74 @@ export async function POST() {
             url: `https://www.ycombinator.com/companies/${companySlug}`,
           },
         });
-      } else if (!company.name && companyName) {
-        company = await prisma.company.update({
-          where: { slug: companySlug },
-          data: { name: companyName },
-        });
+      } catch {
+        company = await prisma.company.findUnique({ where: { slug: companySlug } });
+        if (!company) return "error";
       }
-
-      await prisma.job.create({
-        data: {
-          title: detail?.title || listing.title,
-          slug: listing.jobUrl.split("/").pop() || null,
-          location,
-          jobType: detail?.jobType || listing.jobType,
-          role: detail?.role || listing.role,
-          experience: detail?.experience,
-          salaryMin: detail?.salaryMin,
-          salaryMax: detail?.salaryMax,
-          equity: detail?.equity,
-          visa: detail?.visa,
-          skills: detail?.skills || [],
-          description: detail?.description || "",
-          sourceUrl: listing.jobUrl,
-          postedAt: listing.postedAt,
-          companyId: company.id,
-          embedding: [],
-        },
+    } else if (!company.name && companyName) {
+      company = await prisma.company.update({
+        where: { slug: companySlug },
+        data: { name: companyName },
       });
-      created++;
+    }
 
-      await new Promise((r) => setTimeout(r, 400));
+    await prisma.job.create({
+      data: {
+        title: detail?.title || listing.title,
+        slug: listing.jobUrl.split("/").pop() || null,
+        location,
+        jobType: detail?.jobType || listing.jobType,
+        role: detail?.role || listing.role,
+        experience: detail?.experience,
+        salaryMin: detail?.salaryMin,
+        salaryMax: detail?.salaryMax,
+        equity: detail?.equity,
+        visa: detail?.visa,
+        skills: detail?.skills || [],
+        description: detail?.description || "",
+        sourceUrl: listing.jobUrl,
+        postedAt: listing.postedAt,
+        companyId: company.id,
+        embedding: [],
+      },
+    });
+    return "created";
+  } catch {
+    return "error";
+  }
+}
+
+export async function POST() {
+  try {
+    const [waasListings, ycDirListings] = await Promise.all([
+      scrapeWaaSListings(),
+      scrapeFromYCDirectory(),
+    ]);
+
+    const allListings = [...waasListings, ...ycDirListings].filter(
+      (job, i, arr) => arr.findIndex((j) => j.jobUrl === job.jobUrl) === i
+    );
+
+    let created = 0;
+    let skipped = 0;
+    const DETAIL_BATCH = 5;
+
+    for (let i = 0; i < allListings.length; i += DETAIL_BATCH) {
+      const batch = allListings.slice(i, i + DETAIL_BATCH);
+      const results = await Promise.all(batch.map(processJob));
+      for (const r of results) {
+        if (r === "created") created++;
+        else if (r === "skipped") skipped++;
+      }
     }
 
     return NextResponse.json({
       success: true,
-      total: listings.length,
+      total: allListings.length,
+      fromWaaS: waasListings.length,
+      fromYCDirectory: ycDirListings.length,
       created,
       skipped,
-      detailed,
     });
   } catch (error) {
     console.error("Scrape error:", error);
@@ -99,10 +123,23 @@ export async function POST() {
   }
 }
 
-export async function GET() {
-  const jobs = await prisma.job.findMany({
-    include: { company: true, cluster: true },
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(jobs);
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 200);
+  const offset = parseInt(searchParams.get("offset") || "0");
+
+  const [jobs, total] = await Promise.all([
+    prisma.job.findMany({
+      include: { company: true, cluster: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.job.count(),
+  ]);
+
+  return NextResponse.json(
+    { jobs, total, limit, offset },
+    { headers: { "Cache-Control": "s-maxage=30, stale-while-revalidate=120" } }
+  );
 }

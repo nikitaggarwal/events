@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr";
 import { CandidateCard } from "@/components/CandidateCard";
 import { Badge } from "@/components/Badge";
 
@@ -19,41 +21,32 @@ interface Candidate {
 }
 
 export default function CandidatesPage() {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const { data: candidates, mutate } = useSWR<Candidate[]>("/api/candidates", fetcher);
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
-    fetch("/api/candidates")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setCandidates(data);
-      });
-  }, []);
-
   async function updateStatus(id: string, status: string) {
+    mutate(
+      (prev) => prev?.map((c) => (c.id === id ? { ...c, inviteStatus: status } : c)),
+      false
+    );
     await fetch("/api/candidates", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, inviteStatus: status }),
     });
-    setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, inviteStatus: status } : c))
-    );
+    mutate();
   }
 
-  const filtered =
-    filter === "all"
-      ? candidates
-      : candidates.filter((c) => c.inviteStatus === filter);
+  const all = candidates || [];
+  const filtered = filter === "all" ? all : all.filter((c) => c.inviteStatus === filter);
 
   const counts = {
-    all: candidates.length,
-    not_contacted: candidates.filter((c) => c.inviteStatus === "not_contacted")
-      .length,
-    contacted: candidates.filter((c) => c.inviteStatus === "contacted").length,
-    rsvp: candidates.filter((c) => c.inviteStatus === "rsvp").length,
-    declined: candidates.filter((c) => c.inviteStatus === "declined").length,
-    attended: candidates.filter((c) => c.inviteStatus === "attended").length,
+    all: all.length,
+    not_contacted: all.filter((c) => c.inviteStatus === "not_contacted").length,
+    contacted: all.filter((c) => c.inviteStatus === "contacted").length,
+    rsvp: all.filter((c) => c.inviteStatus === "rsvp").length,
+    declined: all.filter((c) => c.inviteStatus === "declined").length,
+    attended: all.filter((c) => c.inviteStatus === "attended").length,
   };
 
   return (
@@ -116,9 +109,14 @@ export default function CandidatesPage() {
             />
           </div>
         ))}
-        {filtered.length === 0 && (
+        {!candidates && (
           <div className="text-center py-16 text-sm text-yc-text-secondary">
-            {candidates.length === 0
+            Loading candidates...
+          </div>
+        )}
+        {candidates && filtered.length === 0 && (
+          <div className="text-center py-16 text-sm text-yc-text-secondary">
+            {all.length === 0
               ? "No candidates sourced yet. Source candidates from an event page."
               : "No candidates match this filter."}
           </div>

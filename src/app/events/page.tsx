@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
 
 interface Event {
@@ -23,18 +25,10 @@ const STATUS_VARIANT: Record<string, "green" | "orange" | "blue" | "neutral"> = 
 };
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<Event[]>([]);
+  const { data: events, mutate } = useSWR<Event[]>("/api/events", fetcher);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDate, setNewDate] = useState("");
-
-  useEffect(() => {
-    fetch("/api/events")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setEvents(data);
-      });
-  }, []);
 
   async function createEvent(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +38,7 @@ export default function EventsPage() {
       body: JSON.stringify({ name: newName, date: newDate || null }),
     });
     const event = await res.json();
+    mutate();
     window.location.href = `/events/${event.id}`;
   }
 
@@ -117,7 +112,7 @@ export default function EventsPage() {
       )}
 
       <div className="space-y-3">
-        {events.map((event) => {
+        {events?.map((event) => {
           const rsvp = event.candidates.filter(
             (c) => c.inviteStatus === "rsvp"
           ).length;
@@ -181,7 +176,12 @@ export default function EventsPage() {
             </Link>
           );
         })}
-        {events.length === 0 && (
+        {!events && (
+          <div className="text-center py-16 text-sm text-yc-text-secondary">
+            Loading events...
+          </div>
+        )}
+        {events?.length === 0 && (
           <div className="text-center py-16 text-sm text-yc-text-secondary">
             No events yet. Create one or generate from a cluster.
           </div>

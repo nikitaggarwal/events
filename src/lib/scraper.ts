@@ -35,7 +35,8 @@ export interface JobDetail {
 
 const SF_KEYWORDS = [
   "san francisco",
-  "sf",
+  "sf,",
+  "sf bay",
   "bay area",
   "palo alto",
   "mountain view",
@@ -50,12 +51,117 @@ const SF_KEYWORDS = [
   "san mateo",
   "cupertino",
   "dogpatch",
+  "fremont",
+  "emeryville",
+  "milpitas",
+  "daly city",
+  "burlingame",
+  "foster city",
+  "half moon bay",
+  "woodside",
+  "los altos",
+  "campbell",
+  "saratoga",
+  "walnut creek",
+  "pleasanton",
+  "hayward",
+  "union city",
+  "san carlos",
+  "belmont",
+  "san bruno",
+  "millbrae",
+  "stanford",
 ];
 
 export function isSFBayArea(location: string | null): boolean {
   if (!location) return false;
   const lower = location.toLowerCase();
   return SF_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+interface YCCompany {
+  name: string;
+  slug: string;
+  all_locations: string;
+  one_liner: string;
+  batch: string;
+  isHiring: boolean;
+  regions: string[];
+}
+
+async function scrapeCompanyJobs(company: YCCompany): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  try {
+    const pageUrl = `https://www.ycombinator.com/companies/${company.slug}`;
+    const pageRes = await fetch(pageUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      },
+    });
+    const html = await pageRes.text();
+    const $ = cheerio.load(html);
+
+    $('a[href*="/jobs/"]').each((_, el) => {
+      const href = $(el).attr("href") || "";
+      if (!href.includes(`/companies/${company.slug}/jobs/`)) return;
+
+      const jobUrl = href.startsWith("http")
+        ? href
+        : `https://www.ycombinator.com${href}`;
+
+      const jobTitle = $(el).text().trim();
+      if (!jobTitle || jobTitle === "View all jobs") return;
+
+      jobs.push({
+        title: jobTitle,
+        companyName: company.name,
+        companySlug: company.slug,
+        batch: company.batch || null,
+        companyDescription: company.one_liner || null,
+        jobUrl,
+        location: company.all_locations || null,
+        jobType: null,
+        role: null,
+        postedAt: null,
+      });
+    });
+  } catch {
+    // skip failed companies
+  }
+  return jobs;
+}
+
+export async function scrapeFromYCDirectory(): Promise<ScrapedJob[]> {
+  const res = await fetch(
+    "https://yc-oss.github.io/api/companies/hiring.json"
+  );
+  const companies: YCCompany[] = await res.json();
+
+  const sfCompanies = companies.filter((c) => {
+    const loc = (c.all_locations || "").toLowerCase();
+    const regions = (c.regions || []).map((r) => r.toLowerCase());
+    return (
+      SF_KEYWORDS.some((kw) => loc.includes(kw)) ||
+      regions.some((r) => r.includes("san francisco"))
+    );
+  });
+
+  const allJobs: ScrapedJob[] = [];
+  const BATCH_SIZE = 10;
+
+  for (let i = 0; i < sfCompanies.length; i += BATCH_SIZE) {
+    const batch = sfCompanies.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(batch.map(scrapeCompanyJobs));
+    for (const jobs of results) {
+      allJobs.push(...jobs);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+
+  return allJobs.filter(
+    (job, i, arr) => arr.findIndex((j) => j.jobUrl === job.jobUrl) === i
+  );
 }
 
 export async function scrapeWaaSListings(): Promise<ScrapedJob[]> {

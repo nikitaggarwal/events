@@ -40,25 +40,54 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+function cosineDistance(a: number[], b: number[]): number {
+  return 1 - cosineSimilarity(a, b);
+}
+
+function initKMeansPlusPlus(embeddings: number[][], k: number): number[][] {
+  const n = embeddings.length;
+  const centroids: number[][] = [];
+
+  centroids.push([...embeddings[Math.floor(Math.random() * n)]]);
+
+  for (let c = 1; c < k; c++) {
+    const distances = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let minDist = Infinity;
+      for (const centroid of centroids) {
+        const d = cosineDistance(embeddings[i], centroid);
+        if (d < minDist) minDist = d;
+      }
+      distances[i] = minDist * minDist;
+    }
+
+    let totalDist = 0;
+    for (let i = 0; i < n; i++) totalDist += distances[i];
+
+    let r = Math.random() * totalDist;
+    let chosen = 0;
+    for (let i = 0; i < n; i++) {
+      r -= distances[i];
+      if (r <= 0) {
+        chosen = i;
+        break;
+      }
+    }
+    centroids.push([...embeddings[chosen]]);
+  }
+
+  return centroids;
+}
+
 export function kMeansClusters(
   embeddings: number[][],
   k: number,
-  maxIter = 50
+  maxIter = 80
 ): { assignments: number[]; centroids: number[][] } {
   const dim = embeddings[0].length;
   const n = embeddings.length;
 
-  const centroids: number[][] = [];
-  const used = new Set<number>();
-  for (let i = 0; i < k; i++) {
-    let idx: number;
-    do {
-      idx = Math.floor(Math.random() * n);
-    } while (used.has(idx));
-    used.add(idx);
-    centroids.push([...embeddings[idx]]);
-  }
-
+  const centroids = initKMeansPlusPlus(embeddings, k);
   let assignments = new Array(n).fill(0);
 
   for (let iter = 0; iter < maxIter; iter++) {
@@ -103,10 +132,10 @@ export async function labelCluster(
   jobTitles: string[],
   jobDescriptions: string[]
 ): Promise<{ name: string; keywords: string[] }> {
-  const sample = jobTitles.slice(0, 10).join("\n");
+  const sample = jobTitles.slice(0, 20).join("\n");
   const descSample = jobDescriptions
-    .slice(0, 5)
-    .map((d) => d.substring(0, 200))
+    .slice(0, 8)
+    .map((d) => d.substring(0, 300))
     .join("\n---\n");
 
   const res = await openai.chat.completions.create({
@@ -115,7 +144,7 @@ export async function labelCluster(
       {
         role: "system",
         content:
-          "You label clusters of job postings. Return a JSON object with 'name' (a short 2-4 word theme like 'Backend Infrastructure' or 'AI/ML Engineering' or 'Founding Full-Stack') and 'keywords' (an array of 5-8 relevant keywords). Only return the JSON, no markdown.",
+          "You label clusters of similar job postings for a hiring event. The label should be SPECIFIC enough that a single candidate could be qualified for most jobs in the cluster. Return a JSON object with 'name' (a specific 2-5 word event theme like 'React Frontend Engineers', 'DevOps & Cloud Infrastructure', 'Founding Full-Stack Engineers', 'ML Platform Engineers', 'Sales & GTM Leaders', 'Mobile iOS Engineers') and 'keywords' (an array of 5-8 specific technical skills or requirements common across these jobs). Only return the JSON, no markdown.",
       },
       {
         role: "user",

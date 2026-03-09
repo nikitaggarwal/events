@@ -6,7 +6,9 @@ export async function GET() {
     include: { event: true },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(candidates);
+  return NextResponse.json(candidates, {
+    headers: { "Cache-Control": "s-maxage=30, stale-while-revalidate=120" },
+  });
 }
 
 export async function PATCH(request: Request) {

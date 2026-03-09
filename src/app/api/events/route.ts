@@ -9,7 +9,9 @@ export async function GET() {
     },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(events);
+  return NextResponse.json(events, {
+    headers: { "Cache-Control": "s-maxage=30, stale-while-revalidate=120" },
+  });
 }
 
 export async function POST(request: Request) {

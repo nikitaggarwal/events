@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
 import { JobCard } from "@/components/JobCard";
 
@@ -25,12 +27,15 @@ interface Job {
   company: Company;
 }
 
-interface Cluster {
+interface ClusterSummary {
   id: string;
   name: string;
   keywords: string[];
   jobCount: number;
   companyCount: number;
+}
+
+interface ClusterDetail extends ClusterSummary {
   jobs: Job[];
 }
 
@@ -45,25 +50,16 @@ export default function ClustersPage() {
 function ClustersContent() {
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("selected");
-  const [clusters, setClusters] = useState<Cluster[]>([]);
   const [selected, setSelected] = useState<string | null>(selectedId);
   const [creatingEvent, setCreatingEvent] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/cluster")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setClusters(data);
-      });
-  }, []);
+  const { data: clusters } = useSWR<ClusterSummary[]>("/api/cluster", fetcher);
+  const { data: activeCluster } = useSWR<ClusterDetail>(
+    selected ? `/api/cluster/${selected}` : null,
+    fetcher
+  );
 
-  useEffect(() => {
-    if (selectedId) setSelected(selectedId);
-  }, [selectedId]);
-
-  const activeCluster = clusters.find((c) => c.id === selected);
-
-  async function createEventFromCluster(cluster: Cluster) {
+  async function createEventFromCluster(cluster: ClusterSummary) {
     setCreatingEvent(true);
     try {
       const res = await fetch("/api/events", {
@@ -94,7 +90,7 @@ function ClustersContent() {
 
       <div className="flex gap-6">
         <div className="w-72 shrink-0 space-y-2">
-          {clusters.map((c) => (
+          {clusters?.map((c) => (
             <button
               key={c.id}
               onClick={() => setSelected(c.id)}
@@ -115,7 +111,12 @@ function ClustersContent() {
               </div>
             </button>
           ))}
-          {clusters.length === 0 && (
+          {!clusters && (
+            <div className="text-center py-8 text-sm text-yc-text-secondary">
+              Loading clusters...
+            </div>
+          )}
+          {clusters?.length === 0 && (
             <div className="text-center py-8 text-sm text-yc-text-secondary">
               No clusters yet. Run clustering from the Demand Map.
             </div>
@@ -123,6 +124,11 @@ function ClustersContent() {
         </div>
 
         <div className="flex-1 min-w-0">
+          {selected && !activeCluster && (
+            <div className="text-center py-16 text-sm text-yc-text-secondary">
+              Loading cluster details...
+            </div>
+          )}
           {activeCluster ? (
             <>
               <div className="bg-white border border-yc-border rounded-lg p-5 mb-4">
@@ -203,11 +209,11 @@ function ClustersContent() {
                 ))}
               </div>
             </>
-          ) : (
+          ) : !selected ? (
             <div className="text-center py-16 text-sm text-yc-text-secondary">
               Select a cluster to see details and create an event.
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

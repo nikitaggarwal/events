@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, use } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
 import { CandidateCard } from "@/components/CandidateCard";
 import { JobCard } from "@/components/JobCard";
@@ -60,17 +62,11 @@ export default function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [event, setEvent] = useState<EventData | null>(null);
+  const { data: event, mutate } = useSWR<EventData>(`/api/events/${id}`, fetcher);
   const [sourcing, setSourcing] = useState(false);
   const [tab, setTab] = useState<"candidates" | "roles" | "companies">(
     "candidates"
   );
-
-  useEffect(() => {
-    fetch(`/api/events/${id}`)
-      .then((r) => r.json())
-      .then(setEvent);
-  }, [id]);
 
   async function sourceCandidates() {
     if (!event?.cluster) return;
@@ -86,8 +82,7 @@ export default function EventDetailPage({
       });
       const data = await res.json();
       if (data.success) {
-        const updated = await fetch(`/api/events/${id}`).then((r) => r.json());
-        setEvent(updated);
+        mutate();
       }
     } catch (err) {
       console.error("Sourcing failed:", err);
@@ -96,30 +91,33 @@ export default function EventDetailPage({
   }
 
   async function updateCandidateStatus(candidateId: string, status: string) {
+    mutate(
+      (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          candidates: prev.candidates.map((c) =>
+            c.id === candidateId ? { ...c, inviteStatus: status } : c
+          ),
+        };
+      },
+      false
+    );
     await fetch("/api/candidates", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: candidateId, inviteStatus: status }),
     });
-    setEvent((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        candidates: prev.candidates.map((c) =>
-          c.id === candidateId ? { ...c, inviteStatus: status } : c
-        ),
-      };
-    });
+    mutate();
   }
 
   async function updateEventStatus(status: string) {
-    const res = await fetch(`/api/events/${id}`, {
+    await fetch(`/api/events/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    const updated = await res.json();
-    setEvent((prev) => (prev ? { ...prev, status: updated.status } : prev));
+    mutate();
   }
 
   if (!event) {

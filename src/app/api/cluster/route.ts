@@ -111,13 +111,16 @@ export async function POST(request: Request) {
 
 export async function GET() {
   const clusters = await prisma.cluster.findMany({
-    include: {
-      jobs: {
-        include: { company: true },
-        orderBy: { createdAt: "desc" },
-      },
+    select: {
+      id: true,
+      name: true,
+      keywords: true,
+      jobCount: true,
+      companyCount: true,
     },
     orderBy: { jobCount: "desc" },
   });
-  return NextResponse.json(clusters);
+  return NextResponse.json(clusters, {
+    headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" },
+  });
 }

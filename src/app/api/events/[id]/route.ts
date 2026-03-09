@@ -22,7 +22,9 @@ export async function GET(
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  return NextResponse.json(event);
+  return NextResponse.json(event, {
+    headers: { "Cache-Control": "s-maxage=15, stale-while-revalidate=60" },
+  });
 }
 
 export async function PATCH(

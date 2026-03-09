@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr";
 import { StatsCard } from "@/components/StatsCard";
 import { ClusterCard } from "@/components/ClusterCard";
 import { JobCard } from "@/components/JobCard";
@@ -26,45 +28,49 @@ interface Job {
   cluster: { id: string; name: string } | null;
 }
 
-interface Cluster {
+interface ClusterSummary {
   id: string;
   name: string;
   keywords: string[];
   jobCount: number;
   companyCount: number;
+}
+
+interface Stats {
+  jobCount: number;
+  companyCount: number;
+  clusterCount: number;
+}
+
+interface JobsResponse {
   jobs: Job[];
+  total: number;
 }
 
 export default function DemandMap() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [clusters, setClusters] = useState<Cluster[]>([]);
+  const { data: stats, mutate: mutateStats } = useSWR<Stats>("/api/stats", fetcher);
+  const { data: clusters, mutate: mutateClusters } = useSWR<ClusterSummary[]>("/api/cluster", fetcher);
+  const { data: jobsData, mutate: mutateJobs } = useSWR<JobsResponse>("/api/scrape?limit=50", fetcher);
+
   const [scraping, setScraping] = useState(false);
   const [clustering, setClustering] = useState(false);
   const [status, setStatus] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  async function fetchData() {
-    const [jobsRes, clustersRes] = await Promise.all([
-      fetch("/api/scrape").then((r) => r.json()),
-      fetch("/api/cluster").then((r) => r.json()),
-    ]);
-    setJobs(Array.isArray(jobsRes) ? jobsRes : []);
-    setClusters(Array.isArray(clustersRes) ? clustersRes : []);
-  }
+  const jobs = jobsData?.jobs || [];
+  const totalJobs = jobsData?.total || stats?.jobCount || 0;
 
   async function runScrape() {
     setScraping(true);
-    setStatus("Scraping WaaS for SF Bay Area jobs...");
+    setStatus("Scraping WaaS + YC Directory for SF Bay Area jobs... (this may take a few minutes)");
     try {
       const res = await fetch("/api/scrape", { method: "POST" });
       const data = await res.json();
       setStatus(
-        `Scraped ${data.total} listings. ${data.created} new jobs added, ${data.skipped} skipped.`
+        `Found ${data.total} listings (${data.fromWaaS} from WaaS, ${data.fromYCDirectory} from YC Directory). ${data.created} new jobs added, ${data.skipped} skipped.`
       );
-      await fetchData();
+      mutateStats();
+      mutateClusters();
+      mutateJobs();
     } catch (err) {
       setStatus(`Scrape failed: ${err}`);
     }
@@ -78,26 +84,22 @@ export default function DemandMap() {
       const res = await fetch("/api/cluster", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ k: Math.min(8, Math.max(3, Math.floor(jobs.length / 3))) }),
+        body: JSON.stringify({ k: Math.max(5, Math.round(totalJobs / 45)) }),
       });
       const data = await res.json();
       if (data.error) {
         setStatus(`Clustering error: ${data.error}`);
       } else {
         setStatus(`Created ${data.clusterCount} clusters.`);
-        await fetchData();
+        mutateStats();
+        mutateClusters();
+        mutateJobs();
       }
     } catch (err) {
       setStatus(`Clustering failed: ${err}`);
     }
     setClustering(false);
   }
-
-  const uniqueCompanies = new Set(jobs.map((j) => j.company.slug));
-  const recentJobs = jobs.filter((j) => {
-    if (!j.postedAt) return false;
-    return j.postedAt.includes("day") || j.postedAt.includes("hour");
-  });
 
   return (
     <div className="p-8 max-w-[1200px]">
@@ -118,7 +120,7 @@ export default function DemandMap() {
           </button>
           <button
             onClick={runClustering}
-            disabled={clustering || jobs.length === 0}
+            disabled={clustering || totalJobs === 0}
             className="px-4 py-2 text-[13px] font-medium border border-yc-border text-yc-dark rounded-md hover:bg-yc-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {clustering ? "Clustering..." : "Run Clustering"}
@@ -133,25 +135,13 @@ export default function DemandMap() {
       )}
 
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatsCard label="Total Jobs" value={jobs.length} subtitle="SF Bay Area" />
-        <StatsCard
-          label="Companies"
-          value={uniqueCompanies.size}
-          subtitle="YC startups"
-        />
-        <StatsCard
-          label="Clusters"
-          value={clusters.length}
-          subtitle="Role themes"
-        />
-        <StatsCard
-          label="Recent"
-          value={recentJobs.length}
-          subtitle="Posted this week"
-        />
+        <StatsCard label="Total Jobs" value={stats?.jobCount ?? 0} subtitle="SF Bay Area" />
+        <StatsCard label="Companies" value={stats?.companyCount ?? 0} subtitle="YC startups" />
+        <StatsCard label="Clusters" value={stats?.clusterCount ?? 0} subtitle="Role themes" />
+        <StatsCard label="Recent Jobs" value={jobs.length} subtitle={`of ${totalJobs} shown`} />
       </div>
 
-      {clusters.length > 0 && (
+      {(clusters?.length ?? 0) > 0 && (
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-yc-dark">
@@ -162,7 +152,7 @@ export default function DemandMap() {
             </span>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {clusters.map((c) => (
+            {clusters!.map((c) => (
               <ClusterCard
                 key={c.id}
                 id={c.id}
@@ -170,10 +160,7 @@ export default function DemandMap() {
                 keywords={c.keywords}
                 jobCount={c.jobCount}
                 companyCount={c.companyCount}
-                topCompanies={c.jobs
-                  .map((j) => j.company.name)
-                  .filter((v, i, a) => a.indexOf(v) === i)
-                  .slice(0, 5)}
+                topCompanies={[]}
               />
             ))}
           </div>
@@ -183,11 +170,11 @@ export default function DemandMap() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-yc-dark">
-            All Jobs ({jobs.length})
+            All Jobs ({totalJobs})
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-3">
-          {jobs.slice(0, 50).map((job) => (
+          {jobs.map((job) => (
             <JobCard
               key={job.id}
               title={job.title}
@@ -202,7 +189,12 @@ export default function DemandMap() {
               sourceUrl={job.sourceUrl}
             />
           ))}
-          {jobs.length === 0 && (
+          {jobs.length === 0 && !jobsData && (
+            <div className="text-center py-16 text-yc-text-secondary">
+              <p className="text-sm">Loading jobs...</p>
+            </div>
+          )}
+          {jobs.length === 0 && jobsData && (
             <div className="text-center py-16 text-yc-text-secondary">
               <p className="text-sm">No jobs scraped yet.</p>
               <p className="text-xs mt-1">
