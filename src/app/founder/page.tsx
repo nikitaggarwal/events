@@ -174,37 +174,6 @@ export default function FounderConsolePage() {
         </div>
       </header>
 
-      {/* Breadcrumb */}
-      {companyId && (
-        <div className="bg-white border-b border-yc-border">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-2 flex items-center gap-1.5 text-xs">
-            <button
-              onClick={() => { setCompanyId(null); setSelectedEventId(null); }}
-              className="text-yc-text-secondary hover:text-yc-orange transition-colors"
-            >
-              All Companies
-            </button>
-            <span className="text-yc-text-secondary/40">/</span>
-            <button
-              onClick={() => { setSelectedEventId(null); setTab("events"); }}
-              className={`transition-colors ${
-                selectedEventId
-                  ? "text-yc-text-secondary hover:text-yc-orange"
-                  : "text-yc-dark font-medium"
-              }`}
-            >
-              {company?.name || "..."}
-            </button>
-            {selectedEvent && (
-              <>
-                <span className="text-yc-text-secondary/40">/</span>
-                <span className="text-yc-dark font-medium">{selectedEvent.name}</span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-8">
         {/* Level 1: Company selector */}
         {!companyId ? (
@@ -246,11 +215,26 @@ export default function FounderConsolePage() {
 
         /* Level 3: Event founder view (inline) */
         ) : selectedEventId ? (
-          <FounderEventView eventId={selectedEventId} companyId={companyId} />
+          <>
+            <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-4">
+              <button onClick={() => { setCompanyId(null); setSelectedEventId(null); }} className="hover:text-yc-dark">Companies</button>
+              <span>/</span>
+              <button onClick={() => { setSelectedEventId(null); setTab("events"); }} className="hover:text-yc-dark">{company?.name || "..."}</button>
+              <span>/</span>
+              <span>{selectedEvent?.name}</span>
+            </div>
+            <FounderEventView eventId={selectedEventId} companyId={companyId} />
+          </>
 
         /* Level 2: Company dashboard */
         ) : (
           <>
+            <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-4">
+              <button onClick={() => { setCompanyId(null); setSelectedEventId(null); }} className="hover:text-yc-dark">Companies</button>
+              <span>/</span>
+              <span>{company?.name || "..."}</span>
+            </div>
+
             {/* Company header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
               <div>
