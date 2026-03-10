@@ -6,8 +6,9 @@ import { Sidebar } from "./Sidebar";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLanding = pathname === "/";
+  const isFounderConsole = pathname === "/founder";
 
-  if (isLanding) {
+  if (isLanding || isFounderConsole) {
     return <>{children}</>;
   }
 

@@ -29,6 +29,12 @@ interface Job {
   company: Company;
 }
 
+interface ExperienceEntry {
+  title: string;
+  company: string;
+  years: string;
+}
+
 interface Candidate {
   id: string;
   name: string;
@@ -39,7 +45,20 @@ interface Candidate {
   fitScore: number | null;
   fitReason: string | null;
   source: string | null;
+  experience: { current: ExperienceEntry | null; previous: ExperienceEntry | null } | null;
   inviteStatus: string;
+}
+
+interface InteractionStats {
+  contacted: number;
+  rsvp: number;
+  attended: number;
+  starred: number;
+  spoke: number;
+  followUp: number;
+  interviewed: number;
+  offered: number;
+  hired: number;
 }
 
 interface EventData {
@@ -56,6 +75,7 @@ interface EventData {
     jobs: Job[];
   } | null;
   candidates: Candidate[];
+  interactionStats: InteractionStats;
 }
 
 export default function EventDetailPage({
@@ -154,12 +174,7 @@ export default function EventDetailPage({
   }
 
   const candidates = event.candidates || [];
-  const statusCounts = {
-    total: candidates.length,
-    contacted: candidates.filter((c) => c.inviteStatus === "contacted").length,
-    rsvp: candidates.filter((c) => c.inviteStatus === "rsvp").length,
-    attended: candidates.filter((c) => c.inviteStatus === "attended").length,
-  };
+  const s = event.interactionStats || { contacted: 0, rsvp: 0, attended: 0, starred: 0, spoke: 0, followUp: 0, interviewed: 0, offered: 0, hired: 0 };
 
   const uniqueCompanies = event.cluster
     ? event.cluster.jobs
@@ -274,39 +289,24 @@ export default function EventDetailPage({
         </p>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <div className="bg-white border border-yc-border rounded-lg p-4 text-center">
-          <div className="text-2xl font-semibold text-yc-dark">
-            {statusCounts.total}
+      <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-6">
+        {[
+          { label: "Sourced", value: candidates.length, color: "text-yc-dark" },
+          { label: "Contacted", value: s.contacted, color: "text-gray-600" },
+          { label: "RSVP", value: s.rsvp, color: "text-sky-600" },
+          { label: "Attended", value: s.attended, color: "text-teal-600" },
+          { label: "Starred", value: s.starred, color: "text-yc-orange" },
+          { label: "Spoke", value: s.spoke, color: "text-yc-green" },
+          { label: "Follow Up", value: s.followUp, color: "text-blue-600" },
+          { label: "Interview", value: s.interviewed, color: "text-indigo-600" },
+          { label: "Offered", value: s.offered, color: "text-purple-600" },
+          { label: "Hired", value: s.hired, color: "text-emerald-600" },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-white border border-yc-border rounded-lg py-2 px-1 text-center">
+            <div className={`text-lg font-semibold ${stat.color}`}>{stat.value}</div>
+            <div className="text-[9px] text-yc-text-secondary mt-0.5 leading-tight">{stat.label}</div>
           </div>
-          <div className="text-[11px] text-yc-text-secondary mt-0.5">
-            Sourced
-          </div>
-        </div>
-        <div className="bg-white border border-yc-border rounded-lg p-4 text-center">
-          <div className="text-2xl font-semibold text-yc-blue">
-            {statusCounts.contacted}
-          </div>
-          <div className="text-[11px] text-yc-text-secondary mt-0.5">
-            Contacted
-          </div>
-        </div>
-        <div className="bg-white border border-yc-border rounded-lg p-4 text-center">
-          <div className="text-2xl font-semibold text-yc-green">
-            {statusCounts.rsvp}
-          </div>
-          <div className="text-[11px] text-yc-text-secondary mt-0.5">
-            RSVP
-          </div>
-        </div>
-        <div className="bg-white border border-yc-border rounded-lg p-4 text-center">
-          <div className="text-2xl font-semibold text-yc-orange">
-            {statusCounts.attended}
-          </div>
-          <div className="text-[11px] text-yc-text-secondary mt-0.5">
-            Attended
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="border-b border-yc-border mb-6 overflow-x-auto">
@@ -350,6 +350,7 @@ export default function EventDetailPage({
               fitScore={c.fitScore}
               fitReason={c.fitReason}
               source={c.source}
+              experience={c.experience}
               inviteStatus={c.inviteStatus}
               onStatusChange={updateCandidateStatus}
             />

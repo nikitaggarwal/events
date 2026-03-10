@@ -9,6 +9,7 @@ export interface SourcedCandidate {
   location: string | null;
   profileUrl: string;
   highlights: string | null;
+  fullText: string | null;
   source: string;
 }
 
@@ -23,7 +24,7 @@ export async function sourceCandidates(
     type: "neural",
     numResults: options?.numResults || 20,
     category: options?.category || "people",
-    text: { maxCharacters: 500 },
+    text: { maxCharacters: 3000 },
     highlights: { numSentences: 2 },
   });
 
@@ -52,6 +53,7 @@ export async function sourceCandidates(
       profileUrl: r.url,
       highlights:
         r.highlights?.join(" ") || r.text?.substring(0, 300) || null,
+      fullText: r.text || null,
       source: "exa",
     };
   });

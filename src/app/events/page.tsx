@@ -6,6 +6,18 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
 
+interface InteractionStats {
+  contacted: number;
+  rsvp: number;
+  attended: number;
+  starred: number;
+  spoke: number;
+  followUp: number;
+  interviewed: number;
+  offered: number;
+  hired: number;
+}
+
 interface Event {
   id: string;
   name: string;
@@ -13,7 +25,8 @@ interface Event {
   location: string | null;
   status: string;
   cluster: { id: string; name: string } | null;
-  candidates: { id: string; inviteStatus: string }[];
+  candidates: { id: string }[];
+  interactionStats: InteractionStats;
   createdAt: string;
 }
 
@@ -121,12 +134,7 @@ export default function EventsPage() {
 
       <div className="space-y-3">
         {events?.map((event) => {
-          const rsvp = event.candidates.filter(
-            (c) => c.inviteStatus === "rsvp"
-          ).length;
-          const contacted = event.candidates.filter(
-            (c) => c.inviteStatus === "contacted"
-          ).length;
+          const s = event.interactionStats;
 
           return (
             <Link
@@ -160,28 +168,24 @@ export default function EventsPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-yc-text-secondary">
-                  <div className="text-center">
-                    <div className="text-base font-semibold text-yc-dark">
-                      {event.candidates.length}
+                <div className="flex items-center gap-3 text-xs text-yc-text-secondary flex-wrap">
+                  {[
+                    { label: "sourced", value: event.candidates.length, color: "text-yc-dark" },
+                    { label: "contacted", value: s.contacted, color: "text-gray-600" },
+                    { label: "RSVP", value: s.rsvp, color: "text-sky-600" },
+                    { label: "attended", value: s.attended, color: "text-teal-600" },
+                    { label: "hired", value: s.hired, color: "text-emerald-600" },
+                  ].map((stat) => (
+                    <div key={stat.label} className="text-center min-w-[40px]">
+                      <div className={`text-base font-semibold ${stat.color}`}>
+                        {stat.value}
+                      </div>
+                      <div>{stat.label}</div>
                     </div>
-                    <div>sourced</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-base font-semibold text-yc-blue">
-                      {contacted}
-                    </div>
-                    <div>contacted</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-base font-semibold text-yc-green">
-                      {rsvp}
-                    </div>
-                    <div>RSVP</div>
-                  </div>
+                  ))}
                   <button
                     onClick={(e) => deleteEvent(e, event.id)}
-                    className="ml-2 p-1.5 text-yc-text-secondary/40 hover:text-red-500 transition-colors rounded"
+                    className="ml-1 p-1.5 text-yc-text-secondary/40 hover:text-red-500 transition-colors rounded"
                     title="Delete event"
                   >
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

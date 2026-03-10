@@ -94,9 +94,11 @@ model Candidate {
   linkedinUrl  String?
   githubUrl    String?
   highlights   String?
+  fullText     String?
   fitScore     Float?
   fitReason    String?
   source       String?
+  experience   Json?
   inviteStatus String               @default("not_contacted")
   eventId      String?
   event        Event?               @relation(fields: [eventId], references: [id])
@@ -113,11 +115,17 @@ model FounderInteraction {
   company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   eventId     String
   event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  contacted   Boolean   @default(false)
+  rsvp        Boolean   @default(false)
+  attended    Boolean   @default(false)
   starred     Boolean   @default(false)
   spoke       Boolean   @default(false)
   rating      Int?
   notes       String?
   followUp    Boolean   @default(false)
+  interviewed Boolean   @default(false)
+  offered     Boolean   @default(false)
+  hired       Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

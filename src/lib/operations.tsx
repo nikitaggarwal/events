@@ -209,7 +209,7 @@ export function OperationsBanner() {
   return (
     <div className="fixed top-0 left-0 right-0 md:left-60 z-50 flex flex-col gap-1 p-2 pointer-events-none">
       {visible.map((op) => {
-        const elapsed = Math.floor((now - op.startedAt) / 1000);
+        const elapsed = Math.max(0, Math.floor((now - op.startedAt) / 1000));
         const isRunning = op.status === "running";
         const isError = op.status === "error";
         return (
