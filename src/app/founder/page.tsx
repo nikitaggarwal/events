@@ -5,6 +5,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
+import { FounderEventView } from "@/components/FounderEventView";
 
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
@@ -125,6 +126,7 @@ const STATUS_VARIANT: Record<string, "green" | "orange" | "blue" | "neutral"> = 
 
 export default function FounderConsolePage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [tab, setTab] = useState<"events" | "analytics">("events");
 
   const { data: initial } = useSWR<OverviewData>("/api/founder/overview", fetcher);
@@ -141,6 +143,13 @@ export default function FounderConsolePage() {
   const events = data?.events || [];
   const totals = data?.totals;
   const company = data?.company;
+  const selectedEvent = selectedEventId ? events.find((e) => e.id === selectedEventId) : null;
+
+  function selectCompany(id: string) {
+    setCompanyId(id);
+    setSelectedEventId(null);
+    setTab("events");
+  }
 
   return (
     <div className="min-h-screen bg-yc-bg">
@@ -165,8 +174,39 @@ export default function FounderConsolePage() {
         </div>
       </header>
 
+      {/* Breadcrumb */}
+      {companyId && (
+        <div className="bg-white border-b border-yc-border">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-2 flex items-center gap-1.5 text-xs">
+            <button
+              onClick={() => { setCompanyId(null); setSelectedEventId(null); }}
+              className="text-yc-text-secondary hover:text-yc-orange transition-colors"
+            >
+              All Companies
+            </button>
+            <span className="text-yc-text-secondary/40">/</span>
+            <button
+              onClick={() => { setSelectedEventId(null); setTab("events"); }}
+              className={`transition-colors ${
+                selectedEventId
+                  ? "text-yc-text-secondary hover:text-yc-orange"
+                  : "text-yc-dark font-medium"
+              }`}
+            >
+              {company?.name || "..."}
+            </button>
+            {selectedEvent && (
+              <>
+                <span className="text-yc-text-secondary/40">/</span>
+                <span className="text-yc-dark font-medium">{selectedEvent.name}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-8">
-        {/* Company selector */}
+        {/* Level 1: Company selector */}
         {!companyId ? (
           <div className="max-w-xl mx-auto text-center py-16">
             <div className="w-14 h-14 bg-yc-dark rounded-xl flex items-center justify-center mx-auto mb-6">
@@ -186,7 +226,7 @@ export default function FounderConsolePage() {
                 {companies.map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => setCompanyId(c.id)}
+                    onClick={() => selectCompany(c.id)}
                     className="bg-white border border-yc-border rounded-xl p-4 hover:border-yc-orange/40 hover:shadow-sm transition-all text-left"
                   >
                     <div className="flex items-center gap-2">
@@ -203,6 +243,12 @@ export default function FounderConsolePage() {
               </div>
             )}
           </div>
+
+        /* Level 3: Event founder view (inline) */
+        ) : selectedEventId ? (
+          <FounderEventView eventId={selectedEventId} companyId={companyId} />
+
+        /* Level 2: Company dashboard */
         ) : (
           <>
             {/* Company header */}
@@ -221,7 +267,7 @@ export default function FounderConsolePage() {
               <div className="flex gap-2">
                 <select
                   value={companyId}
-                  onChange={(e) => setCompanyId(e.target.value)}
+                  onChange={(e) => selectCompany(e.target.value)}
                   className="text-sm border border-yc-border rounded-md px-3 py-2 focus:outline-none focus:border-yc-orange"
                 >
                   {companies.map((c) => (
@@ -282,7 +328,6 @@ export default function FounderConsolePage() {
               const ae = analyticsData.events;
               return (
                 <div className="space-y-6">
-                  {/* Funnel */}
                   <div className="bg-white border border-yc-border rounded-xl p-5">
                     <h2 className="text-sm font-semibold text-yc-dark mb-4">Your Hiring Funnel</h2>
                     <div className="space-y-1.5">
@@ -304,7 +349,6 @@ export default function FounderConsolePage() {
                     </div>
                   </div>
 
-                  {/* Event comparison table */}
                   <div className="bg-white border border-yc-border rounded-xl p-5 overflow-x-auto">
                     <h2 className="text-sm font-semibold text-yc-dark mb-4">Event Comparison</h2>
                     <table className="w-full text-xs">
@@ -325,9 +369,9 @@ export default function FounderConsolePage() {
                         {ae.map((e) => (
                           <tr key={e.id} className="border-b border-yc-border/50 hover:bg-yc-bg/50">
                             <td className="py-2.5 pr-4">
-                              <a href={`/events/${e.id}/founder`} className="font-medium text-yc-dark hover:text-yc-orange transition-colors">
+                              <button onClick={() => { setSelectedEventId(e.id); setTab("events"); }} className="font-medium text-yc-dark hover:text-yc-orange transition-colors text-left">
                                 {e.name}
-                              </a>
+                              </button>
                               <div className="text-[10px] text-yc-text-secondary mt-0.5">
                                 {e.date && new Date(e.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                 {" · "}
@@ -363,7 +407,6 @@ export default function FounderConsolePage() {
                     </table>
                   </div>
 
-                  {/* Per-event visual bars */}
                   <div className="bg-white border border-yc-border rounded-xl p-5">
                     <h2 className="text-sm font-semibold text-yc-dark mb-4">Event Performance</h2>
                     <div className="space-y-4">
@@ -402,10 +445,10 @@ export default function FounderConsolePage() {
               {events.map((event) => {
                 const s = event.stats;
                 return (
-                  <Link
+                  <button
                     key={event.id}
-                    href={`/events/${event.id}/founder`}
-                    className="block bg-white border border-yc-border rounded-xl p-5 hover:border-yc-orange/30 transition-colors"
+                    onClick={() => setSelectedEventId(event.id)}
+                    className="block w-full text-left bg-white border border-yc-border rounded-xl p-5 hover:border-yc-orange/30 transition-colors"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -440,7 +483,7 @@ export default function FounderConsolePage() {
                         </svg>
                       </div>
                     </div>
-                  </Link>
+                  </button>
                 );
               })}
               {events.length === 0 && (
