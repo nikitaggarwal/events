@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "delete-events": "prisma db execute --file scripts/delete-events.sql"
   },
   "dependencies": {
     "@prisma/adapter-neon": "^7.4.2",
