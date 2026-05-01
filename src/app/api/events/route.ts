@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { compareEventsByStatusThenDateDesc } from "@/lib/event-sort";
 
 export async function GET() {
   const events = await prisma.event.findMany({
@@ -7,8 +8,9 @@ export async function GET() {
       cluster: { select: { id: true, name: true } },
       candidates: { select: { id: true } },
     },
-    orderBy: { createdAt: "desc" },
   });
+
+  events.sort((a, b) => compareEventsByStatusThenDateDesc(a, b));
 
   const eventIds = events.map((e) => e.id);
 
@@ -16,15 +18,15 @@ export async function GET() {
     eventIds.length > 0
       ? await prisma.$queryRaw`
           SELECT "eventId",
-            COUNT(*) FILTER (WHERE "contacted") as contacted,
-            COUNT(*) FILTER (WHERE "rsvp") as rsvp,
-            COUNT(*) FILTER (WHERE "attended") as attended,
-            COUNT(*) FILTER (WHERE "starred") as starred,
-            COUNT(*) FILTER (WHERE "spoke") as spoke,
-            COUNT(*) FILTER (WHERE "followUp") as "followUp",
-            COUNT(*) FILTER (WHERE "interviewed") as interviewed,
-            COUNT(*) FILTER (WHERE "offered") as offered,
-            COUNT(*) FILTER (WHERE "hired") as hired
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "contacted") as contacted,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "rsvp") as rsvp,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "attended") as attended,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "starred") as starred,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "spoke") as spoke,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "followUp") as "followUp",
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "interviewed") as interviewed,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "offered") as offered,
+            COUNT(DISTINCT "candidateId") FILTER (WHERE "hired") as hired
           FROM "FounderInteraction"
           WHERE "eventId" = ANY(${eventIds})
           GROUP BY "eventId"

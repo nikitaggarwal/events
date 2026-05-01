@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, use, useCallback, useMemo } from "react";
+import { useState, use, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
@@ -105,12 +107,28 @@ interface FounderData {
   stats: FounderStats;
 }
 
-export default function FounderViewPage({
+function parseFilterParam(raw: string | null): FilterKey {
+  if (!raw) return "all";
+  const allowed: FilterKey[] = ["all", "contacted", "rsvp", "attended", "starred", "spoke", "followUp", "interviewed", "offered", "hired"];
+  return allowed.includes(raw as FilterKey) ? (raw as FilterKey) : "all";
+}
+
+function FounderUrlSync({ params }: { params: Promise<{ id: string }> }) {
+  const { id: eventId } = use(params);
+  const searchParams = useSearchParams();
+  const initialFilter = parseFilterParam(searchParams.get("filter"));
+  return <FounderEventPageInner key={`${eventId}-${initialFilter}`} params={params} initialFilter={initialFilter} />;
+}
+
+function FounderEventPageInner({
   params,
+  initialFilter,
 }: {
   params: Promise<{ id: string }>;
+  initialFilter: FilterKey;
 }) {
   const { id: eventId } = use(params);
+
   const { data: event } = useSWR<EventSummary>(`/api/founder/event?eventId=${eventId}`, fetcher);
 
   const companies = event?.companies || [];
@@ -173,7 +191,7 @@ export default function FounderViewPage({
     setNotesOpen(null);
   }
 
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>(initialFilter);
 
   const selectedJob = selectedJobId
     ? founderData?.company?.jobs.find((j) => j.id === selectedJobId)
@@ -208,9 +226,9 @@ export default function FounderViewPage({
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-2">
-          <a href="/events" className="hover:text-yc-dark">Events</a>
+          <Link href="/events" className="hover:text-yc-dark">Events</Link>
           <span>/</span>
-          <a href={`/events/${eventId}`} className="hover:text-yc-dark">{event?.name || "..."}</a>
+          <Link href={`/events/${eventId}`} className="hover:text-yc-dark">{event?.name || "..."}</Link>
           <span>/</span>
           <span>Founder View</span>
         </div>
@@ -313,8 +331,10 @@ export default function FounderViewPage({
           ] as { label: string; value: number; color: string; key: FilterKey }[]).map((s) => (
             <button
               key={s.key}
+              type="button"
+              title={s.key === "all" ? "Show all candidates" : `Show only ${s.label} candidates`}
               onClick={() => setFilter(filter === s.key ? "all" : s.key)}
-              className={`bg-white border rounded-lg py-2 px-1 text-center transition-colors ${
+              className={`bg-white border rounded-lg py-2 px-1 text-center transition-colors cursor-pointer ${
                 filter === s.key && s.key !== "all"
                   ? "border-yc-orange ring-1 ring-yc-orange/20"
                   : "border-yc-border hover:border-yc-orange/30"
@@ -551,5 +571,13 @@ export default function FounderViewPage({
         )}
       </div>
     </div>
+  );
+}
+
+export default function FounderViewPage(props: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<div className="p-8 pt-14 md:pt-8 text-sm text-yc-text-secondary">Loading…</div>}>
+      <FounderUrlSync {...props} />
+    </Suspense>
   );
 }

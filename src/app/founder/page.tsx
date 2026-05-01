@@ -124,10 +124,68 @@ const STATUS_VARIANT: Record<string, "green" | "orange" | "blue" | "neutral"> = 
   completed: "green",
 };
 
+interface FounderMatch {
+  id: string;
+  applicant: { id: string; name: string; email: string; skills: string[]; interests: string | null; linkedinUrl: string | null };
+  company: { id: string; name: string; slug: string; batch: string | null };
+  event: { id: string; name: string; date: string | null };
+  messages: { content: string; sender: string; createdAt: string }[];
+}
+
+interface ChatMessage {
+  id: string;
+  matchId: string;
+  sender: string;
+  content: string;
+  createdAt: string;
+}
+
+type CompanyPipelineStage =
+  | "contacted"
+  | "rsvp"
+  | "attended"
+  | "starred"
+  | "spoke"
+  | "followUp"
+  | "interviewed"
+  | "offered"
+  | "hired";
+
+const STAGE_LABEL: Record<CompanyPipelineStage, string> = {
+  contacted: "Contacted",
+  rsvp: "RSVP'd",
+  attended: "Attended",
+  starred: "Starred",
+  spoke: "Spoke",
+  followUp: "Follow Up",
+  interviewed: "Interview",
+  offered: "Offered",
+  hired: "Hired",
+};
+
+interface PipelineApiRow {
+  interactionId: string;
+  candidate: {
+    id: string;
+    name: string;
+    title: string | null;
+    company: string | null;
+    highlights: string | null;
+    linkedinUrl: string | null;
+  };
+  event: { id: string; name: string; date: string | null; status: string };
+  flags: Record<string, boolean>;
+}
+
 export default function FounderConsolePage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"events" | "analytics">("events");
+  const [tab, setTab] = useState<"events" | "analytics" | "messages">("events");
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [msgInput, setMsgInput] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [companyPipelineStage, setCompanyPipelineStage] = useState<CompanyPipelineStage | null>(null);
+  const [eventEntryFilter, setEventEntryFilter] = useState<CompanyPipelineStage | null>(null);
 
   const { data: initial } = useSWR<OverviewData>("/api/founder/overview", fetcher);
   const { data } = useSWR<OverviewData>(
@@ -136,6 +194,21 @@ export default function FounderConsolePage() {
   );
   const { data: analyticsData } = useSWR<FounderAnalytics>(
     companyId && tab === "analytics" ? `/api/analytics/founder?companyId=${companyId}` : null,
+    fetcher
+  );
+  const { data: founderMatches, mutate: mutateMatches } = useSWR<FounderMatch[]>(
+    companyId && tab === "messages" ? `/api/matches?companyId=${companyId}` : null,
+    fetcher
+  );
+  const { data: chatMessages, mutate: mutateMessages } = useSWR<ChatMessage[]>(
+    selectedMatchId ? `/api/messages?matchId=${selectedMatchId}` : null,
+    fetcher,
+    { refreshInterval: 3000 }
+  );
+  const { data: pipelineData } = useSWR<{ rows: PipelineApiRow[] }>(
+    companyId && companyPipelineStage && !selectedEventId
+      ? `/api/founder/pipeline?companyId=${companyId}&stage=${companyPipelineStage}`
+      : null,
     fetcher
   );
 
@@ -148,8 +221,27 @@ export default function FounderConsolePage() {
   function selectCompany(id: string) {
     setCompanyId(id);
     setSelectedEventId(null);
+    setSelectedMatchId(null);
     setTab("events");
+    setCompanyPipelineStage(null);
+    setEventEntryFilter(null);
   }
+
+  async function sendFounderMessage() {
+    if (!selectedMatchId || !msgInput.trim()) return;
+    setSendingMsg(true);
+    await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matchId: selectedMatchId, sender: "founder", content: msgInput.trim() }),
+    });
+    setMsgInput("");
+    setSendingMsg(false);
+    mutateMessages();
+    mutateMatches();
+  }
+
+  const selectedMatch = founderMatches?.find((m) => m.id === selectedMatchId);
 
   return (
     <div className="min-h-screen bg-yc-bg">
@@ -217,20 +309,25 @@ export default function FounderConsolePage() {
         ) : selectedEventId ? (
           <>
             <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-4">
-              <button onClick={() => { setCompanyId(null); setSelectedEventId(null); }} className="hover:text-yc-dark">Companies</button>
+              <button onClick={() => { setCompanyId(null); setSelectedEventId(null); setEventEntryFilter(null); setCompanyPipelineStage(null); }} className="hover:text-yc-dark">Companies</button>
               <span>/</span>
-              <button onClick={() => { setSelectedEventId(null); setTab("events"); }} className="hover:text-yc-dark">{company?.name || "..."}</button>
+              <button onClick={() => { setSelectedEventId(null); setEventEntryFilter(null); setTab("events"); }} className="hover:text-yc-dark">{company?.name || "..."}</button>
               <span>/</span>
               <span>{selectedEvent?.name}</span>
             </div>
-            <FounderEventView eventId={selectedEventId} companyId={companyId} />
+            <FounderEventView
+              key={`${selectedEventId}-${eventEntryFilter ?? "all"}`}
+              eventId={selectedEventId}
+              companyId={companyId}
+              initialPipelineFilter={eventEntryFilter}
+            />
           </>
 
         /* Level 2: Company dashboard */
         ) : (
           <>
             <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-4">
-              <button onClick={() => { setCompanyId(null); setSelectedEventId(null); }} className="hover:text-yc-dark">Companies</button>
+              <button onClick={() => { setCompanyId(null); setSelectedEventId(null); setEventEntryFilter(null); setCompanyPipelineStage(null); }} className="hover:text-yc-dark">Companies</button>
               <span>/</span>
               <span>{company?.name || "..."}</span>
             </div>
@@ -268,33 +365,119 @@ export default function FounderConsolePage() {
               <div className="mb-6">
                 <div className="text-[10px] text-yc-text-secondary uppercase tracking-wider mb-2">Pipeline across all events</div>
                 <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                  {[
-                    { label: "Events", value: totals.events, color: "text-yc-dark" },
-                    { label: "Contacted", value: totals.contacted, color: "text-gray-600" },
-                    { label: "RSVP'd", value: totals.rsvp, color: "text-sky-600" },
-                    { label: "Attended", value: totals.attended, color: "text-teal-600" },
-                    { label: "Starred", value: totals.starred, color: "text-yc-orange" },
-                    { label: "Spoke", value: totals.spoke, color: "text-yc-green" },
-                    { label: "Follow Up", value: totals.followUp, color: "text-blue-600" },
-                    { label: "Interview", value: totals.interviewed, color: "text-indigo-600" },
-                    { label: "Offered", value: totals.offered, color: "text-purple-600" },
-                    { label: "Hired", value: totals.hired, color: "text-emerald-600" },
-                  ].map((s) => (
-                    <div key={s.label} className="bg-white border border-yc-border rounded-lg py-2 px-1 text-center">
-                      <div className={`text-lg font-semibold ${s.color}`}>{s.value}</div>
-                      <div className="text-[9px] text-yc-text-secondary mt-0.5 leading-tight">{s.label}</div>
-                    </div>
-                  ))}
+                  {(
+                    [
+                      { label: "Events", value: totals.events, color: "text-yc-dark", stage: null },
+                      { label: "Contacted", value: totals.contacted, color: "text-gray-600", stage: "contacted" as const },
+                      { label: "RSVP'd", value: totals.rsvp, color: "text-sky-600", stage: "rsvp" as const },
+                      { label: "Attended", value: totals.attended, color: "text-teal-600", stage: "attended" as const },
+                      { label: "Starred", value: totals.starred, color: "text-yc-orange", stage: "starred" as const },
+                      { label: "Spoke", value: totals.spoke, color: "text-yc-green", stage: "spoke" as const },
+                      { label: "Follow Up", value: totals.followUp, color: "text-blue-600", stage: "followUp" as const },
+                      { label: "Interview", value: totals.interviewed, color: "text-indigo-600", stage: "interviewed" as const },
+                      { label: "Offered", value: totals.offered, color: "text-purple-600", stage: "offered" as const },
+                      { label: "Hired", value: totals.hired, color: "text-emerald-600", stage: "hired" as const },
+                    ] as const
+                  ).map((s) =>
+                    s.stage === null ? (
+                      <div key={s.label} className="bg-white border border-yc-border rounded-lg py-2 px-1 text-center">
+                        <div className={`text-lg font-semibold ${s.color}`}>{s.value}</div>
+                        <div className="text-[9px] text-yc-text-secondary mt-0.5 leading-tight">{s.label}</div>
+                      </div>
+                    ) : (
+                      <button
+                        key={s.label}
+                        type="button"
+                        title={`List candidates marked ${STAGE_LABEL[s.stage]} across all events`}
+                        onClick={() =>
+                          setCompanyPipelineStage(companyPipelineStage === s.stage ? null : s.stage)
+                        }
+                        className={`bg-white border rounded-lg py-2 px-1 text-center transition-colors cursor-pointer ${
+                          companyPipelineStage === s.stage
+                            ? "border-yc-orange ring-1 ring-yc-orange/25"
+                            : "border-yc-border hover:border-yc-orange/35"
+                        }`}
+                      >
+                        <div className={`text-lg font-semibold ${s.color}`}>{s.value}</div>
+                        <div className="text-[9px] text-yc-text-secondary mt-0.5 leading-tight">{s.label}</div>
+                      </button>
+                    ),
+                  )}
                 </div>
+
+                {companyPipelineStage && !selectedEventId && (
+                  <div className="mt-4 bg-white border border-yc-border rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h3 className="text-sm font-semibold text-yc-dark">
+                        {STAGE_LABEL[companyPipelineStage]}
+                        {pipelineData && (
+                          <span className="text-yc-text-secondary font-normal">
+                            {" "}
+                            · {pipelineData.rows.length} interaction{pipelineData.rows.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setCompanyPipelineStage(null)}
+                        className="text-xs font-medium text-yc-orange hover:underline"
+                      >
+                        Clear filter
+                      </button>
+                    </div>
+                    {!pipelineData && (
+                      <div className="text-sm text-yc-text-secondary py-6 text-center">Loading…</div>
+                    )}
+                    {pipelineData && pipelineData.rows.length === 0 && (
+                      <div className="text-sm text-yc-text-secondary py-6 text-center">No rows for this stage.</div>
+                    )}
+                    {pipelineData && pipelineData.rows.length > 0 && (
+                      <ul className="divide-y divide-yc-border max-h-[320px] overflow-y-auto">
+                        {pipelineData.rows.map((row) => (
+                          <li key={row.interactionId} className="py-2.5 first:pt-0 flex flex-wrap items-baseline justify-between gap-2">
+                            <div>
+                              <span className="text-sm font-medium text-yc-dark">{row.candidate.name}</span>
+                              {(row.candidate.title || row.candidate.company) && (
+                                <span className="text-xs text-yc-text-secondary ml-2">
+                                  {[row.candidate.title, row.candidate.company].filter(Boolean).join(" · ")}
+                                </span>
+                              )}
+                              <div className="text-[11px] text-yc-text-secondary mt-0.5">
+                                <Link
+                                  href={`/events/${row.event.id}/founder?filter=${companyPipelineStage}`}
+                                  className="text-yc-orange hover:underline"
+                                >
+                                  {row.event.name}
+                                </Link>
+                                {row.event.date &&
+                                  ` · ${new Date(row.event.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                              </div>
+                            </div>
+                            {row.candidate.linkedinUrl && (
+                              <a
+                                href={row.candidate.linkedinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-yc-purple shrink-0 hover:underline"
+                              >
+                                LinkedIn
+                              </a>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Tabs */}
             <div className="border-b border-yc-border mb-6 flex gap-6">
-              {(["events", "analytics"] as const).map((t) => (
+              {(["events", "analytics", "messages"] as const).map((t) => (
                 <button
                   key={t}
-                  onClick={() => setTab(t)}
+                  onClick={() => { setTab(t); setSelectedMatchId(null); }}
                   className={`pb-3 text-[13px] font-medium border-b-2 transition-colors capitalize ${
                     tab === t
                       ? "border-yc-orange text-yc-orange"
@@ -353,7 +536,15 @@ export default function FounderConsolePage() {
                         {ae.map((e) => (
                           <tr key={e.id} className="border-b border-yc-border/50 hover:bg-yc-bg/50">
                             <td className="py-2.5 pr-4">
-                              <button onClick={() => { setSelectedEventId(e.id); setTab("events"); }} className="font-medium text-yc-dark hover:text-yc-orange transition-colors text-left">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedEventId(e.id);
+                                  setEventEntryFilter(null);
+                                  setTab("events");
+                                }}
+                                className="font-medium text-yc-dark hover:text-yc-orange transition-colors text-left"
+                              >
                                 {e.name}
                               </button>
                               <div className="text-[10px] text-yc-text-secondary mt-0.5">
@@ -423,19 +614,144 @@ export default function FounderConsolePage() {
               <div className="text-center py-16 text-sm text-yc-text-secondary">Loading analytics...</div>
             )}
 
+            {/* Messages tab */}
+            {tab === "messages" && !selectedMatchId && (
+              <div className="space-y-3">
+                <div className="text-[10px] text-yc-text-secondary uppercase tracking-wider">
+                  Matched applicants — mutual interest
+                </div>
+                {(!founderMatches || founderMatches.length === 0) && (
+                  <div className="text-center py-16 text-sm text-yc-text-secondary bg-white border border-yc-border rounded-xl">
+                    No matches yet. When you and an applicant both express interest, a match is created.
+                  </div>
+                )}
+                {founderMatches?.map((match) => (
+                  <button
+                    key={match.id}
+                    onClick={() => setSelectedMatchId(match.id)}
+                    className="block w-full text-left bg-white border border-yc-border rounded-xl p-5 hover:border-yc-green/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-yc-purple-light rounded-full flex items-center justify-center text-sm font-bold text-yc-purple">
+                            {match.applicant.name[0]}
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-yc-dark">{match.applicant.name}</span>
+                            <div className="text-xs text-yc-text-secondary">{match.applicant.email}</div>
+                          </div>
+                          <Badge variant="green">Match</Badge>
+                        </div>
+                        <div className="text-xs text-yc-text-secondary mt-1 ml-10">
+                          via {match.event.name}
+                          {match.applicant.skills.length > 0 && ` · ${match.applicant.skills.slice(0, 3).join(", ")}`}
+                        </div>
+                      </div>
+                      {match.messages.length > 0 ? (
+                        <div className="text-xs text-yc-text-secondary text-right max-w-[200px] truncate">{match.messages[0].content}</div>
+                      ) : (
+                        <span className="text-xs text-yc-orange">Start chatting</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {tab === "messages" && selectedMatchId && selectedMatch && (
+              <div>
+                <button
+                  onClick={() => setSelectedMatchId(null)}
+                  className="text-xs text-yc-text-secondary hover:text-yc-dark mb-3 inline-flex items-center gap-1"
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 4l-4 4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Back to matches
+                </button>
+
+                <div className="bg-white border border-yc-border rounded-xl p-4 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-yc-purple-light rounded-full flex items-center justify-center text-sm font-bold text-yc-purple">
+                      {selectedMatch.applicant.name[0]}
+                    </div>
+                    <div>
+                      <span className="text-sm font-semibold text-yc-dark">{selectedMatch.applicant.name}</span>
+                      <div className="text-xs text-yc-text-secondary">{selectedMatch.applicant.email}</div>
+                    </div>
+                    {selectedMatch.applicant.linkedinUrl && (
+                      <a href={selectedMatch.applicant.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-yc-purple hover:underline ml-2">LinkedIn</a>
+                    )}
+                  </div>
+                  {selectedMatch.applicant.skills.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1 ml-10">
+                      {selectedMatch.applicant.skills.map((s) => (
+                        <span key={s} className="text-[10px] px-1.5 py-0.5 bg-yc-purple-light border border-yc-purple/15 rounded-full text-yc-purple">{s}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white border border-yc-border rounded-xl flex flex-col" style={{ height: "calc(100vh - 380px)" }}>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {(!chatMessages || chatMessages.length === 0) && (
+                      <div className="text-center py-8 text-xs text-yc-text-secondary">
+                        Start the conversation! Introduce your company or discuss the role.
+                      </div>
+                    )}
+                    {chatMessages?.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.sender === "founder" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                          msg.sender === "founder"
+                            ? "bg-yc-orange text-white rounded-br-md"
+                            : "bg-yc-bg border border-yc-border text-yc-dark rounded-bl-md"
+                        }`}>
+                          <p className="text-sm">{msg.content}</p>
+                          <p className={`text-[10px] mt-1 ${msg.sender === "founder" ? "text-white/60" : "text-yc-text-secondary"}`}>
+                            {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-yc-border p-3 flex gap-2">
+                    <input
+                      value={msgInput}
+                      onChange={(e) => setMsgInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendFounderMessage()}
+                      placeholder="Type a message..."
+                      className="flex-1 px-3 py-2 border border-yc-border rounded-lg text-sm focus:outline-none focus:border-yc-orange"
+                    />
+                    <button
+                      onClick={sendFounderMessage}
+                      disabled={!msgInput.trim() || sendingMsg}
+                      className="px-4 py-2 bg-yc-orange text-white text-sm font-medium rounded-lg hover:bg-yc-orange-hover transition-colors disabled:opacity-50"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Event list */}
             {tab === "events" && <div className="space-y-3">
               <div className="text-[10px] text-yc-text-secondary uppercase tracking-wider">Your events</div>
               {events.map((event) => {
                 const s = event.stats;
                 return (
-                  <button
+                  <div
                     key={event.id}
-                    onClick={() => setSelectedEventId(event.id)}
-                    className="block w-full text-left bg-white border border-yc-border rounded-xl p-5 hover:border-yc-orange/30 transition-colors"
+                    className="bg-white border border-yc-border rounded-xl p-5 hover:border-yc-orange/25 transition-colors"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
+                      <button
+                        type="button"
+                        className="flex-1 text-left min-w-0"
+                        onClick={() => {
+                          setEventEntryFilter(null);
+                          setSelectedEventId(event.id);
+                        }}
+                      >
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-sm font-semibold text-yc-dark">{event.name}</h3>
                           <Badge variant={STATUS_VARIANT[event.status] || "neutral"}>{event.status}</Badge>
@@ -448,26 +764,40 @@ export default function FounderConsolePage() {
                           {event.location && ` · ${event.location}`}
                           {` · ${event.candidateCount} candidates`}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {[
-                          { label: "Starred", value: s.starred, color: "text-yc-orange" },
-                          { label: "Spoke", value: s.spoke, color: "text-yc-green" },
-                          { label: "Interview", value: s.interviewed, color: "text-indigo-600" },
-                          { label: "Offered", value: s.offered, color: "text-purple-600" },
-                          { label: "Hired", value: s.hired, color: "text-emerald-600" },
-                        ].map((stat) => (
-                          <div key={stat.label} className="text-center min-w-[40px]">
+                      </button>
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap shrink-0">
+                        {(
+                          [
+                            { label: "Contacted", value: s.contacted, color: "text-gray-600", stage: "contacted" as const },
+                            { label: "Starred", value: s.starred, color: "text-yc-orange", stage: "starred" as const },
+                            { label: "Spoke", value: s.spoke, color: "text-yc-green", stage: "spoke" as const },
+                            { label: "Interview", value: s.interviewed, color: "text-indigo-600", stage: "interviewed" as const },
+                            { label: "Offered", value: s.offered, color: "text-purple-600", stage: "offered" as const },
+                            { label: "Hired", value: s.hired, color: "text-emerald-600", stage: "hired" as const },
+                          ] as const
+                        ).map((stat) => (
+                          <button
+                            key={stat.label}
+                            type="button"
+                            title={`Open event — show ${stat.label} only`}
+                            onClick={() => {
+                              setEventEntryFilter(stat.stage);
+                              setSelectedEventId(event.id);
+                            }}
+                            className="text-center min-w-[38px] rounded-md px-1 py-1 border border-transparent hover:border-yc-border hover:bg-yc-bg/80 transition-colors cursor-pointer"
+                          >
                             <div className={`text-base font-semibold ${stat.color}`}>{stat.value}</div>
                             <div className="text-[9px] text-yc-text-secondary">{stat.label}</div>
-                          </div>
+                          </button>
                         ))}
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-yc-text-secondary/30 ml-1">
-                          <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <span className="text-yc-text-secondary/30 ml-0.5 hidden sm:inline" aria-hidden>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
               {events.length === 0 && (

@@ -20,6 +20,9 @@ model Company {
   domainClusterId String?
   domainCluster   Cluster?             @relation(fields: [domainClusterId], references: [id])
   interactions    FounderInteraction[]
+  applicantInterests ApplicantCompanyInterest[]
+  founderApplicantInterests FounderApplicantInterest[]
+  matches         Match[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -80,6 +83,9 @@ model Event {
   status       String               @default("draft")
   candidates   Candidate[]
   interactions FounderInteraction[]
+  applicantInterests ApplicantCompanyInterest[]
+  founderApplicantInterests FounderApplicantInterest[]
+  matches      Match[]
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 }
@@ -131,4 +137,78 @@ model FounderInteraction {
 
   @@unique([candidateId, companyId, eventId])
   @@index([eventId, companyId])
+}
+
+model Applicant {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  linkedinUrl    String?
+  resumeUrl      String?
+  resumeFilename String?
+  skills         String[]
+  interests      String?
+  embedding      Float[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  companyInterests  ApplicantCompanyInterest[]
+  founderInterests  FounderApplicantInterest[]
+  matches           Match[]
+}
+
+model ApplicantCompanyInterest {
+  id          String    @id @default(cuid())
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([applicantId, companyId, eventId])
+  @@index([companyId, eventId])
+}
+
+model FounderApplicantInterest {
+  id          String    @id @default(cuid())
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([applicantId, companyId, eventId])
+  @@index([applicantId, eventId])
+}
+
+model Match {
+  id          String    @id @default(cuid())
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages    Message[]
+
+  @@unique([applicantId, companyId, eventId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender    String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([matchId, createdAt])
 }

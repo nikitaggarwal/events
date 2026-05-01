@@ -7,8 +7,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLanding = pathname === "/";
   const isFounderConsole = pathname === "/founder";
+  const isApplicantConsole = pathname.startsWith("/apply");
 
-  if (isLanding || isFounderConsole) {
+  if (isLanding || isFounderConsole || isApplicantConsole) {
     return <>{children}</>;
   }
 

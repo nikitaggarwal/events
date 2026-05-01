@@ -1,10 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
+
+type EventListStageFilter =
+  | "all"
+  | "sourced"
+  | "contacted"
+  | "rsvp"
+  | "attended"
+  | "starred"
+  | "spoke"
+  | "followUp"
+  | "interviewed"
+  | "offered"
+  | "hired";
 
 interface InteractionStats {
   contacted: number;
@@ -30,6 +43,36 @@ interface Event {
   createdAt: string;
 }
 
+function eventMatchesListFilter(ev: Event, f: EventListStageFilter): boolean {
+  if (f === "all") return true;
+  const s = ev.interactionStats;
+  const n = ev.candidates.length;
+  switch (f) {
+    case "sourced":
+      return n > 0;
+    case "contacted":
+      return s.contacted > 0;
+    case "rsvp":
+      return s.rsvp > 0;
+    case "attended":
+      return s.attended > 0;
+    case "starred":
+      return s.starred > 0;
+    case "spoke":
+      return s.spoke > 0;
+    case "followUp":
+      return s.followUp > 0;
+    case "interviewed":
+      return s.interviewed > 0;
+    case "offered":
+      return s.offered > 0;
+    case "hired":
+      return s.hired > 0;
+    default:
+      return true;
+  }
+}
+
 const STATUS_VARIANT: Record<string, "green" | "orange" | "blue" | "neutral"> = {
   draft: "neutral",
   planning: "blue",
@@ -39,9 +82,65 @@ const STATUS_VARIANT: Record<string, "green" | "orange" | "blue" | "neutral"> = 
 
 export default function EventsPage() {
   const { data: events, mutate } = useSWR<Event[]>("/api/events", fetcher);
+  const [listStageFilter, setListStageFilter] = useState<EventListStageFilter>("all");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDate, setNewDate] = useState("");
+
+  const totals = useMemo(() => {
+    if (!events?.length) {
+      return {
+        sourced: 0,
+        contacted: 0,
+        rsvp: 0,
+        attended: 0,
+        starred: 0,
+        spoke: 0,
+        followUp: 0,
+        interviewed: 0,
+        offered: 0,
+        hired: 0,
+      };
+    }
+    return events.reduce(
+      (acc, ev) => {
+        const s = ev.interactionStats;
+        return {
+          sourced: acc.sourced + ev.candidates.length,
+          contacted: acc.contacted + s.contacted,
+          rsvp: acc.rsvp + s.rsvp,
+          attended: acc.attended + s.attended,
+          starred: acc.starred + s.starred,
+          spoke: acc.spoke + s.spoke,
+          followUp: acc.followUp + s.followUp,
+          interviewed: acc.interviewed + s.interviewed,
+          offered: acc.offered + s.offered,
+          hired: acc.hired + s.hired,
+        };
+      },
+      {
+        sourced: 0,
+        contacted: 0,
+        rsvp: 0,
+        attended: 0,
+        starred: 0,
+        spoke: 0,
+        followUp: 0,
+        interviewed: 0,
+        offered: 0,
+        hired: 0,
+      }
+    );
+  }, [events]);
+
+  const filteredEvents = useMemo(() => {
+    if (!events?.length) return [];
+    return events.filter((e) => eventMatchesListFilter(e, listStageFilter));
+  }, [events, listStageFilter]);
+
+  function toggleListFilter(next: EventListStageFilter) {
+    setListStageFilter((prev) => (prev === next ? "all" : next));
+  }
 
   async function deleteEvent(e: React.MouseEvent, eventId: string) {
     e.preventDefault();
@@ -79,6 +178,69 @@ export default function EventsPage() {
           New Event
         </button>
       </div>
+
+      {events && events.length > 0 && (
+        <>
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-4">
+            {(
+              [
+                { label: "Sourced", value: totals.sourced, color: "text-yc-dark", key: "sourced" as const },
+                { label: "Contacted", value: totals.contacted, color: "text-gray-600", key: "contacted" as const },
+                { label: "RSVP", value: totals.rsvp, color: "text-sky-600", key: "rsvp" as const },
+                { label: "Attended", value: totals.attended, color: "text-teal-600", key: "attended" as const },
+                { label: "Starred", value: totals.starred, color: "text-yc-orange", key: "starred" as const },
+                { label: "Spoke", value: totals.spoke, color: "text-yc-green", key: "spoke" as const },
+                { label: "Follow Up", value: totals.followUp, color: "text-blue-600", key: "followUp" as const },
+                { label: "Interview", value: totals.interviewed, color: "text-indigo-600", key: "interviewed" as const },
+                { label: "Offered", value: totals.offered, color: "text-purple-600", key: "offered" as const },
+                { label: "Hired", value: totals.hired, color: "text-emerald-600", key: "hired" as const },
+              ] as const
+            ).map((stat) => {
+              const active = listStageFilter === stat.key;
+              return (
+                <button
+                  key={stat.key}
+                  type="button"
+                  title={
+                    active
+                      ? "Show all events"
+                      : `Only events with ${stat.label.toLowerCase()} activity`
+                  }
+                  onClick={() => toggleListFilter(stat.key)}
+                  className={[
+                    "rounded-lg py-2 px-1.5 text-center transition-colors duration-150 cursor-pointer",
+                    "ring-1 ring-inset",
+                    active
+                      ? "bg-zinc-100/90 text-yc-dark ring-zinc-300/90"
+                      : "bg-white ring-zinc-200/70 hover:bg-zinc-50 hover:ring-zinc-300/80",
+                  ].join(" ")}
+                >
+                  <div className={`text-lg font-semibold tabular-nums ${stat.color}`}>{stat.value}</div>
+                  <div
+                    className={`text-[9px] mt-0.5 leading-tight ${
+                      active ? "text-yc-dark font-medium" : "text-yc-text-secondary"
+                    }`}
+                  >
+                    {stat.label}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {listStageFilter !== "all" && (
+            <p className="text-xs text-yc-text-secondary mb-6">
+              Showing {filteredEvents.length} of {events.length} events ·{" "}
+              <button
+                type="button"
+                className="text-yc-orange hover:underline"
+                onClick={() => setListStageFilter("all")}
+              >
+                Clear filter
+              </button>
+            </p>
+          )}
+        </>
+      )}
 
       {showCreate && (
         <form
@@ -133,17 +295,16 @@ export default function EventsPage() {
       )}
 
       <div className="space-y-3">
-        {events?.map((event) => {
+        {filteredEvents.map((event) => {
           const s = event.interactionStats;
 
           return (
-            <Link
+            <div
               key={event.id}
-              href={`/events/${event.id}`}
-              className="block bg-white border border-yc-border rounded-lg p-5 hover:border-yc-orange/30 transition-colors"
+              className="bg-white border border-yc-border rounded-lg p-5 hover:border-yc-orange/30 transition-colors"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <Link href={`/events/${event.id}`} className="flex-1 min-w-0 hover:text-yc-orange transition-colors">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm font-semibold text-yc-dark">
                       {event.name}
@@ -167,23 +328,50 @@ export default function EventsPage() {
                       <Badge variant="purple">{event.cluster.name}</Badge>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-yc-text-secondary flex-wrap">
-                  {[
-                    { label: "sourced", value: event.candidates.length, color: "text-yc-dark" },
-                    { label: "contacted", value: s.contacted, color: "text-gray-600" },
-                    { label: "RSVP", value: s.rsvp, color: "text-sky-600" },
-                    { label: "attended", value: s.attended, color: "text-teal-600" },
-                    { label: "hired", value: s.hired, color: "text-emerald-600" },
-                  ].map((stat) => (
-                    <div key={stat.label} className="text-center min-w-[40px]">
-                      <div className={`text-base font-semibold ${stat.color}`}>
-                        {stat.value}
-                      </div>
-                      <div>{stat.label}</div>
-                    </div>
-                  ))}
+                </Link>
+                <div className="flex items-center gap-2 text-xs text-yc-text-secondary flex-wrap">
+                  {(
+                    [
+                      { label: "sourced", value: event.candidates.length, color: "text-yc-dark", filter: null as string | null },
+                      { label: "contacted", value: s.contacted, color: "text-gray-600", filter: "contacted" },
+                      { label: "RSVP", value: s.rsvp, color: "text-sky-600", filter: "rsvp" },
+                      { label: "attended", value: s.attended, color: "text-teal-600", filter: "attended" },
+                      { label: "starred", value: s.starred, color: "text-yc-orange", filter: "starred" },
+                      { label: "spoke", value: s.spoke, color: "text-yc-green", filter: "spoke" },
+                      { label: "follow up", value: s.followUp, color: "text-blue-600", filter: "followUp" },
+                      { label: "interviewed", value: s.interviewed, color: "text-indigo-600", filter: "interviewed" },
+                      { label: "offered", value: s.offered, color: "text-purple-600", filter: "offered" },
+                      { label: "hired", value: s.hired, color: "text-emerald-600", filter: "hired" },
+                    ] as const
+                  ).map((stat) => {
+                    const pill = (
+                      <>
+                        <div className={`text-base font-semibold ${stat.color}`}>
+                          {stat.value}
+                        </div>
+                        <div>{stat.label}</div>
+                      </>
+                    );
+                    const href = stat.filter
+                      ? `/events/${event.id}?filter=${stat.filter}`
+                      : `/events/${event.id}`;
+                    return (
+                      <Link
+                        key={stat.label}
+                        href={href}
+                        title={
+                          stat.filter
+                            ? `Event: candidates with ${stat.label}`
+                            : "Event detail"
+                        }
+                        className="text-center min-w-[40px] rounded-md px-1 py-0.5 hover:bg-yc-bg border border-transparent hover:border-yc-border transition-colors"
+                      >
+                        {pill}
+                      </Link>
+                    );
+                  })}
                   <button
+                    type="button"
                     onClick={(e) => deleteEvent(e, event.id)}
                     className="ml-1 p-1.5 text-yc-text-secondary/40 hover:text-red-500 transition-colors rounded"
                     title="Delete event"
@@ -194,9 +382,21 @@ export default function EventsPage() {
                   </button>
                 </div>
               </div>
-            </Link>
+            </div>
           );
         })}
+        {events && events.length > 0 && filteredEvents.length === 0 && (
+          <div className="text-center py-16 text-sm text-yc-text-secondary">
+            No events match this filter.{" "}
+            <button
+              type="button"
+              className="text-yc-orange hover:underline"
+              onClick={() => setListStageFilter("all")}
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
         {!events && (
           <div className="text-center py-16 text-sm text-yc-text-secondary">
             Loading events...

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { compareEventsByStatusThenDateDesc } from "@/lib/event-sort";
 
 export async function GET(request: NextRequest) {
   const companyId = request.nextUrl.searchParams.get("companyId");
@@ -67,8 +68,9 @@ export async function GET(request: NextRequest) {
       cluster: { select: { id: true, name: true, type: true } },
       _count: { select: { candidates: true } },
     },
-    orderBy: { date: "desc" },
   });
+
+  events.sort((a, b) => compareEventsByStatusThenDateDesc(a, b));
 
   const enriched = events.map((e) => ({
     id: e.id,

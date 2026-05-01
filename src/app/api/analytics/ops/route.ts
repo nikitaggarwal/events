@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { compareEventsByStatusThenDateDesc } from "@/lib/event-sort";
 
 export async function GET() {
   const events = await prisma.event.findMany({
@@ -12,8 +13,9 @@ export async function GET() {
       cluster: { select: { name: true, type: true } },
       _count: { select: { candidates: true } },
     },
-    orderBy: { date: "desc" },
   });
+
+  events.sort((a, b) => compareEventsByStatusThenDateDesc(a, b));
 
   const eventIds = events.map((e) => e.id);
 
@@ -27,15 +29,15 @@ export async function GET() {
   }[] = eventIds.length > 0
     ? await prisma.$queryRaw`
         SELECT "eventId",
-          COUNT(*) FILTER (WHERE "contacted") as contacted,
-          COUNT(*) FILTER (WHERE "rsvp") as rsvp,
-          COUNT(*) FILTER (WHERE "attended") as attended,
-          COUNT(*) FILTER (WHERE "starred") as starred,
-          COUNT(*) FILTER (WHERE "spoke") as spoke,
-          COUNT(*) FILTER (WHERE "followUp") as "followUp",
-          COUNT(*) FILTER (WHERE "interviewed") as interviewed,
-          COUNT(*) FILTER (WHERE "offered") as offered,
-          COUNT(*) FILTER (WHERE "hired") as hired,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "contacted") as contacted,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "rsvp") as rsvp,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "attended") as attended,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "starred") as starred,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "spoke") as spoke,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "followUp") as "followUp",
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "interviewed") as interviewed,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "offered") as offered,
+          COUNT(DISTINCT "candidateId") FILTER (WHERE "hired") as hired,
           COUNT(DISTINCT "companyId") as companies
         FROM "FounderInteraction"
         WHERE "eventId" = ANY(${eventIds})
@@ -112,9 +114,9 @@ export async function GET() {
     eventIds.length > 0
       ? await prisma.$queryRaw`
           SELECT fi."companyId", c."name",
-            COUNT(*) FILTER (WHERE fi."hired") as hired,
-            COUNT(*) FILTER (WHERE fi."interviewed") as interviewed,
-            COUNT(*) FILTER (WHERE fi."spoke") as spoke
+            COUNT(DISTINCT fi."candidateId") FILTER (WHERE fi."hired") as hired,
+            COUNT(DISTINCT fi."candidateId") FILTER (WHERE fi."interviewed") as interviewed,
+            COUNT(DISTINCT fi."candidateId") FILTER (WHERE fi."spoke") as spoke
           FROM "FounderInteraction" fi
           JOIN "Company" c ON c.id = fi."companyId"
           WHERE fi."eventId" = ANY(${eventIds})

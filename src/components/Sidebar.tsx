@@ -5,10 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/clusters", label: "Clusters", icon: "grid" },
   { href: "/events", label: "Events", icon: "calendar" },
   { href: "/analytics", label: "Analytics", icon: "analytics" },
   { href: "/dashboard", label: "Dashboard", icon: "chart" },
+  { href: "/clusters", label: "Clusters", icon: "grid" },
   { href: "/candidates", label: "Candidates", icon: "users" },
 ];
 

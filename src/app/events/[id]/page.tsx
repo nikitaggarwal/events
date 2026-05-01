@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useMemo, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { useOperations } from "@/lib/operations";
 import { Badge } from "@/components/Badge";
 import { CandidateCard } from "@/components/CandidateCard";
 import { JobCard } from "@/components/JobCard";
+import { candidateMatchesPipelineStage } from "@/lib/candidate-pipeline-stage";
 
 interface Company {
   id: string;
@@ -35,6 +37,30 @@ interface ExperienceEntry {
   years: string;
 }
 
+type CandidateStageFilter =
+  | "all"
+  | "contacted"
+  | "rsvp"
+  | "attended"
+  | "starred"
+  | "spoke"
+  | "followUp"
+  | "interviewed"
+  | "offered"
+  | "hired";
+
+interface FounderInteractionFlags {
+  contacted: boolean;
+  rsvp: boolean;
+  attended: boolean;
+  starred: boolean;
+  spoke: boolean;
+  followUp: boolean;
+  interviewed: boolean;
+  offered: boolean;
+  hired: boolean;
+}
+
 interface Candidate {
   id: string;
   name: string;
@@ -47,6 +73,30 @@ interface Candidate {
   source: string | null;
   experience: { current: ExperienceEntry | null; previous: ExperienceEntry | null } | null;
   inviteStatus: string;
+  founderInteraction: FounderInteractionFlags | null;
+}
+
+function candidateMatchesStage(c: Candidate, filter: CandidateStageFilter): boolean {
+  if (filter === "all") return true;
+  return candidateMatchesPipelineStage(c, filter);
+}
+
+function parseEventOpsFilter(sp: { get: (key: string) => string | null }): CandidateStageFilter {
+  const raw = sp.get("filter");
+  const allowed: CandidateStageFilter[] = [
+    "all",
+    "contacted",
+    "rsvp",
+    "attended",
+    "starred",
+    "spoke",
+    "followUp",
+    "interviewed",
+    "offered",
+    "hired",
+  ];
+  if (raw && (allowed as string[]).includes(raw)) return raw as CandidateStageFilter;
+  return "all";
 }
 
 interface InteractionStats {
@@ -78,12 +128,13 @@ interface EventData {
   interactionStats: InteractionStats;
 }
 
-export default function EventDetailPage({
-  params,
+function EventDetailBody({
+  id,
+  initialCandidateFilter,
 }: {
-  params: Promise<{ id: string }>;
+  id: string;
+  initialCandidateFilter: CandidateStageFilter;
 }) {
-  const { id } = use(params);
   const { data: event, mutate } = useSWR<EventData>(`/api/events/${id}`, fetcher);
   const { data: allClusters } = useSWR<{ id: string; name: string; jobCount: number }[]>(
     "/api/cluster",
@@ -94,6 +145,8 @@ export default function EventDetailPage({
   const [tab, setTab] = useState<"candidates" | "roles" | "companies">(
     "candidates"
   );
+  const [candidateStageFilter, setCandidateStageFilter] =
+    useState<CandidateStageFilter>(initialCandidateFilter);
   const [relinking, setRelinking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -175,6 +228,15 @@ export default function EventDetailPage({
 
   const candidates = event.candidates || [];
   const s = event.interactionStats || { contacted: 0, rsvp: 0, attended: 0, starred: 0, spoke: 0, followUp: 0, interviewed: 0, offered: 0, hired: 0 };
+  const filteredCandidates =
+    candidateStageFilter === "all"
+      ? candidates
+      : candidates.filter((c) => candidateMatchesStage(c, candidateStageFilter));
+
+  function setStageFilter(next: CandidateStageFilter) {
+    setCandidateStageFilter((prev) => (prev === next ? "all" : next));
+    setTab("candidates");
+  }
 
   const uniqueCompanies = event.cluster
     ? event.cluster.jobs
@@ -186,9 +248,9 @@ export default function EventDetailPage({
     <div className="p-4 pt-14 md:pt-8 md:p-8 max-w-[1200px]">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs text-yc-text-secondary mb-2">
-          <a href="/events" className="hover:text-yc-dark">
+          <Link href="/events" className="hover:text-yc-dark">
             Events
-          </a>
+          </Link>
           <span>/</span>
           <span>{event.name}</span>
         </div>
@@ -290,30 +352,70 @@ export default function EventDetailPage({
       )}
 
       <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-6">
-        {[
-          { label: "Sourced", value: candidates.length, color: "text-yc-dark" },
-          { label: "Contacted", value: s.contacted, color: "text-gray-600" },
-          { label: "RSVP", value: s.rsvp, color: "text-sky-600" },
-          { label: "Attended", value: s.attended, color: "text-teal-600" },
-          { label: "Starred", value: s.starred, color: "text-yc-orange" },
-          { label: "Spoke", value: s.spoke, color: "text-yc-green" },
-          { label: "Follow Up", value: s.followUp, color: "text-blue-600" },
-          { label: "Interview", value: s.interviewed, color: "text-indigo-600" },
-          { label: "Offered", value: s.offered, color: "text-purple-600" },
-          { label: "Hired", value: s.hired, color: "text-emerald-600" },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white border border-yc-border rounded-lg py-2 px-1 text-center">
-            <div className={`text-lg font-semibold ${stat.color}`}>{stat.value}</div>
-            <div className="text-[9px] text-yc-text-secondary mt-0.5 leading-tight">{stat.label}</div>
-          </div>
-        ))}
+        {(
+          [
+            { label: "Sourced", value: candidates.length, color: "text-yc-dark", key: "all" as const },
+            { label: "Contacted", value: s.contacted, color: "text-gray-600", key: "contacted" as const },
+            { label: "RSVP", value: s.rsvp, color: "text-sky-600", key: "rsvp" as const },
+            { label: "Attended", value: s.attended, color: "text-teal-600", key: "attended" as const },
+            { label: "Starred", value: s.starred, color: "text-yc-orange", key: "starred" as const },
+            { label: "Spoke", value: s.spoke, color: "text-yc-green", key: "spoke" as const },
+            { label: "Follow Up", value: s.followUp, color: "text-blue-600", key: "followUp" as const },
+            { label: "Interview", value: s.interviewed, color: "text-indigo-600", key: "interviewed" as const },
+            { label: "Offered", value: s.offered, color: "text-purple-600", key: "offered" as const },
+            { label: "Hired", value: s.hired, color: "text-emerald-600", key: "hired" as const },
+          ] as const
+        ).map((stat) => {
+          const active = candidateStageFilter === stat.key;
+          return (
+            <button
+              key={stat.key}
+              type="button"
+              title={active ? "Click to show all candidates" : `Show candidates in ${stat.label}`}
+              onClick={() => setStageFilter(stat.key)}
+              className={[
+                "rounded-lg py-2 px-1.5 text-center transition-colors duration-150 cursor-pointer",
+                "ring-1 ring-inset",
+                active
+                  ? "bg-zinc-100/90 text-yc-dark ring-zinc-300/90"
+                  : "bg-white ring-zinc-200/70 hover:bg-zinc-50 hover:ring-zinc-300/80",
+              ].join(" ")}
+            >
+              <div className={`text-lg font-semibold tabular-nums ${stat.color}`}>{stat.value}</div>
+              <div
+                className={`text-[9px] mt-0.5 leading-tight ${
+                  active ? "text-yc-dark font-medium" : "text-yc-text-secondary"
+                }`}
+              >
+                {stat.label}
+              </div>
+            </button>
+          );
+        })}
       </div>
+      {candidateStageFilter !== "all" && (
+        <p className="text-xs text-yc-text-secondary -mt-3 mb-4">
+          Showing {filteredCandidates.length} of {candidates.length} candidates ·{" "}
+          <button
+            type="button"
+            className="text-yc-orange hover:underline"
+            onClick={() => setCandidateStageFilter("all")}
+          >
+            Clear filter
+          </button>
+        </p>
+      )}
 
       <div className="border-b border-yc-border mb-6 overflow-x-auto">
         <div className="flex gap-4 sm:gap-6 min-w-max">
           {(
             [
-              ["candidates", `Candidates (${candidates.length})`],
+              [
+                "candidates",
+                candidateStageFilter === "all"
+                  ? `Candidates (${candidates.length})`
+                  : `Candidates (${filteredCandidates.length}/${candidates.length})`,
+              ],
               [
                 "roles",
                 `Open Roles (${event.cluster?.jobs.length || 0})`,
@@ -338,7 +440,7 @@ export default function EventDetailPage({
 
       {tab === "candidates" && (
         <div className="space-y-3">
-          {candidates.map((c) => (
+          {filteredCandidates.map((c) => (
             <CandidateCard
               key={c.id}
               id={c.id}
@@ -355,6 +457,11 @@ export default function EventDetailPage({
               onStatusChange={updateCandidateStatus}
             />
           ))}
+          {candidates.length > 0 && filteredCandidates.length === 0 && (
+            <div className="text-center py-12 text-sm text-yc-text-secondary">
+              No candidates match this stage. Try another filter or clear it.
+            </div>
+          )}
           {candidates.length === 0 && (
             <div className="text-center py-12 text-sm text-yc-text-secondary">
               {event.cluster ? (
@@ -447,5 +554,30 @@ export default function EventDetailPage({
         </button>
       </div>
     </div>
+  );
+}
+
+function EventDetailUrlSync({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const sp = useSearchParams();
+  const initialCandidateFilter = useMemo(() => parseEventOpsFilter(sp), [sp]);
+  return (
+    <EventDetailBody
+      key={`${id}-${initialCandidateFilter}`}
+      id={id}
+      initialCandidateFilter={initialCandidateFilter}
+    />
+  );
+}
+
+export default function EventDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-yc-text-secondary">Loading...</div>}>
+      <EventDetailUrlSync params={params} />
+    </Suspense>
   );
 }

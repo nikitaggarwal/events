@@ -5,6 +5,17 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/swr";
 import { Badge } from "@/components/Badge";
 
+interface ApplicantInterest {
+  id: string;
+  name: string;
+  email: string;
+  skills: string[];
+  interests: string | null;
+  linkedinUrl: string | null;
+  founderInterested: boolean;
+  matched: boolean;
+}
+
 const TECH_KEYWORDS = new Set([
   "python", "java", "c++", "c#", "javascript", "typescript", "go", "rust", "ruby", "swift", "kotlin", "scala", "r",
   "react", "angular", "vue", "next.js", "node.js", "django", "flask", "spring", "rails",
@@ -108,9 +119,11 @@ interface EventSummary {
 interface Props {
   eventId: string;
   companyId: string;
+  /** When opening from a funnel stat on the event list, pre-select this filter */
+  initialPipelineFilter?: FilterKey | null;
 }
 
-export function FounderEventView({ eventId, companyId }: Props) {
+export function FounderEventView({ eventId, companyId, initialPipelineFilter = null }: Props) {
   const { data: event } = useSWR<EventSummary>(`/api/founder/event?eventId=${eventId}`, fetcher);
 
   const { data: founderData, mutate } = useSWR<FounderData>(
@@ -118,10 +131,16 @@ export function FounderEventView({ eventId, companyId }: Props) {
     fetcher
   );
 
+  const { data: applicantData, mutate: mutateApplicants } = useSWR<ApplicantInterest[]>(
+    companyId ? `/api/founder/applicants?eventId=${eventId}&companyId=${companyId}` : null,
+    fetcher
+  );
+
   const [notesOpen, setNotesOpen] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"candidates" | "applicants">("candidates");
 
   const updateInteraction = useCallback(
     async (candidateId: string, patch: Record<string, unknown>) => {
@@ -168,7 +187,18 @@ export function FounderEventView({ eventId, companyId }: Props) {
     setNotesOpen(null);
   }
 
-  const [filter, setFilter] = useState<FilterKey>("all");
+  async function toggleFounderInterest(applicantId: string) {
+    await fetch("/api/founder/interest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicantId, companyId, eventId }),
+    });
+    mutateApplicants();
+  }
+
+  const [filter, setFilter] = useState<FilterKey>(() =>
+    initialPipelineFilter && initialPipelineFilter !== "all" ? initialPipelineFilter : "all",
+  );
 
   const selectedJob = selectedJobId
     ? founderData?.company?.jobs.find((j) => j.id === selectedJobId)
@@ -278,8 +308,10 @@ export function FounderEventView({ eventId, companyId }: Props) {
           ] as { label: string; value: number; color: string; key: FilterKey }[]).map((s) => (
             <button
               key={s.key}
+              type="button"
+              title={s.key === "all" ? "Show all candidates" : `Show only ${s.label} candidates`}
               onClick={() => setFilter(filter === s.key ? "all" : s.key)}
-              className={`bg-white border rounded-lg py-2 px-1 text-center transition-colors ${
+              className={`bg-white border rounded-lg py-2 px-1 text-center transition-colors cursor-pointer ${
                 filter === s.key && s.key !== "all"
                   ? "border-yc-orange ring-1 ring-yc-orange/20"
                   : "border-yc-border hover:border-yc-orange/30"
@@ -292,8 +324,101 @@ export function FounderEventView({ eventId, companyId }: Props) {
         </div>
       </div>
 
+      {/* Tabs: Candidates vs Applicants */}
+      <div className="border-b border-yc-border mb-4 flex gap-6">
+        <button
+          onClick={() => setActiveTab("candidates")}
+          className={`pb-3 text-[13px] font-medium border-b-2 transition-colors ${
+            activeTab === "candidates"
+              ? "border-yc-orange text-yc-orange"
+              : "border-transparent text-yc-text-secondary hover:text-yc-dark"
+          }`}
+        >
+          Sourced Candidates ({candidates.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("applicants")}
+          className={`pb-3 text-[13px] font-medium border-b-2 transition-colors ${
+            activeTab === "applicants"
+              ? "border-yc-purple text-yc-purple"
+              : "border-transparent text-yc-text-secondary hover:text-yc-dark"
+          }`}
+        >
+          Applicant Interest
+          {applicantData && applicantData.length > 0 && (
+            <span className="ml-1.5 text-[10px] bg-yc-purple text-white rounded-full px-1.5 py-0.5">{applicantData.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* Applicants tab */}
+      {activeTab === "applicants" && (
+        <div className="space-y-2">
+          {(!applicantData || applicantData.length === 0) && (
+            <div className="text-center py-16 text-sm text-yc-text-secondary bg-white border border-yc-border rounded-xl">
+              No applicants have expressed interest in your company for this event yet.
+              <br />
+              <span className="text-xs text-yc-text-secondary/60 mt-1 block">
+                Applicants can browse events and mark companies they want to speak with.
+              </span>
+            </div>
+          )}
+          {applicantData?.map((a) => (
+            <div
+              key={a.id}
+              className={`bg-white border rounded-xl p-4 transition-colors ${
+                a.matched ? "border-yc-green/40 ring-1 ring-yc-green/10" : a.founderInterested ? "border-yc-purple/40" : "border-yc-border"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-yc-purple-light rounded-full flex items-center justify-center text-sm font-bold text-yc-purple shrink-0 mt-0.5">
+                  {a.name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-yc-dark">{a.name}</span>
+                    {a.matched && <Badge variant="green">Matched</Badge>}
+                    {!a.matched && a.founderInterested && <Badge variant="purple">You want to talk</Badge>}
+                  </div>
+                  <div className="text-xs text-yc-text-secondary mt-0.5">{a.email}</div>
+                  {a.skills.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {a.skills.map((s) => (
+                        <span key={s} className="text-[11px] px-2 py-0.5 bg-yc-purple-light border border-yc-purple/15 rounded-full text-yc-purple font-medium">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {a.interests && (
+                    <p className="mt-1.5 text-xs text-yc-text leading-relaxed line-clamp-2">{a.interests}</p>
+                  )}
+                  {a.linkedinUrl && (
+                    <a href={a.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-yc-purple hover:underline mt-1 inline-block">
+                      LinkedIn Profile
+                    </a>
+                  )}
+                </div>
+                <button
+                  onClick={() => toggleFounderInterest(a.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 ${
+                    a.matched
+                      ? "bg-yc-green text-white"
+                      : a.founderInterested
+                      ? "bg-yc-purple text-white hover:bg-purple-700"
+                      : "border border-yc-orange text-yc-orange hover:bg-yc-orange hover:text-white"
+                  }`}
+                >
+                  {a.matched ? "Matched!" : a.founderInterested ? "Want to Talk" : "Want to Talk"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Candidate list */}
-      <div className="space-y-2">
+      {activeTab === "candidates" && <div className="space-y-2">
         {candidates.map((c) => (
           <div
             key={c.id}
@@ -455,7 +580,7 @@ export function FounderEventView({ eventId, companyId }: Props) {
         {!founderData && companyId && (
           <div className="text-center py-16 text-sm text-yc-text-secondary">Loading candidates...</div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pipelineInteractionStatsFromCandidates } from "@/lib/candidate-pipeline-stage";
 
 export async function GET(
   _request: Request,
@@ -27,59 +28,77 @@ export async function GET(
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  const aggs: { contacted: bigint; rsvp: bigint; attended: bigint; starred: bigint; spoke: bigint; followUp: bigint; interviewed: bigint; offered: bigint; hired: bigint }[] =
-    await prisma.$queryRaw`
-      SELECT
-        COUNT(*) FILTER (WHERE "contacted") as contacted,
-        COUNT(*) FILTER (WHERE "rsvp") as rsvp,
-        COUNT(*) FILTER (WHERE "attended") as attended,
-        COUNT(*) FILTER (WHERE "starred") as starred,
-        COUNT(*) FILTER (WHERE "spoke") as spoke,
-        COUNT(*) FILTER (WHERE "followUp") as "followUp",
-        COUNT(*) FILTER (WHERE "interviewed") as interviewed,
-        COUNT(*) FILTER (WHERE "offered") as offered,
-        COUNT(*) FILTER (WHERE "hired") as hired
-      FROM "FounderInteraction"
-      WHERE "eventId" = ${id}
-    `;
-
-  const a = aggs[0];
-  const interactionStats = {
-    contacted: Number(a?.contacted ?? 0),
-    rsvp: Number(a?.rsvp ?? 0),
-    attended: Number(a?.attended ?? 0),
-    starred: Number(a?.starred ?? 0),
-    spoke: Number(a?.spoke ?? 0),
-    followUp: Number(a?.followUp ?? 0),
-    interviewed: Number(a?.interviewed ?? 0),
-    offered: Number(a?.offered ?? 0),
-    hired: Number(a?.hired ?? 0),
-  };
-
-  // Derive best status per candidate from interactions (across all companies)
-  const candidateStatuses: { candidateId: string; contacted: boolean; rsvp: boolean; attended: boolean }[] =
-    await prisma.$queryRaw`
+  // Per-candidate flags: any founder interaction on this event (OR across companies)
+  const candidateInteractionAgg: {
+    candidateId: string;
+    contacted: boolean;
+    rsvp: boolean;
+    attended: boolean;
+    starred: boolean;
+    spoke: boolean;
+    followUp: boolean;
+    interviewed: boolean;
+    offered: boolean;
+    hired: boolean;
+  }[] = await prisma.$queryRaw`
       SELECT "candidateId",
         bool_or("contacted") as contacted,
         bool_or("rsvp") as rsvp,
-        bool_or("attended") as attended
+        bool_or("attended") as attended,
+        bool_or("starred") as starred,
+        bool_or("spoke") as spoke,
+        bool_or("followUp") as "followUp",
+        bool_or("interviewed") as interviewed,
+        bool_or("offered") as offered,
+        bool_or("hired") as hired
       FROM "FounderInteraction"
       WHERE "eventId" = ${id}
       GROUP BY "candidateId"
     `;
 
-  const statusMap = new Map(candidateStatuses.map((s) => [s.candidateId, s]));
+  const interactionMap = new Map(
+    candidateInteractionAgg.map((row) => [row.candidateId, row])
+  );
 
   const enrichedCandidates = event.candidates.map((c) => {
-    const s = statusMap.get(c.id);
+    const s = interactionMap.get(c.id);
     let derivedStatus = c.inviteStatus;
     if (s) {
       if (s.attended) derivedStatus = "attended";
       else if (s.rsvp) derivedStatus = "rsvp";
       else if (s.contacted) derivedStatus = "contacted";
     }
-    return { ...c, inviteStatus: derivedStatus };
+    return {
+      ...c,
+      inviteStatus: derivedStatus,
+      founderInteraction: s
+        ? {
+            contacted: s.contacted,
+            rsvp: s.rsvp,
+            attended: s.attended,
+            starred: s.starred,
+            spoke: s.spoke,
+            followUp: s.followUp,
+            interviewed: s.interviewed,
+            offered: s.offered,
+            hired: s.hired,
+          }
+        : null,
+    };
   });
+
+  const pipeline = pipelineInteractionStatsFromCandidates(enrichedCandidates);
+  const interactionStats = {
+    contacted: pipeline.contacted,
+    rsvp: pipeline.rsvp,
+    attended: pipeline.attended,
+    starred: pipeline.starred,
+    spoke: pipeline.spoke,
+    followUp: pipeline.followUp,
+    interviewed: pipeline.interviewed,
+    offered: pipeline.offered,
+    hired: pipeline.hired,
+  };
 
   const base = { ...event, candidates: enrichedCandidates, interactionStats };
 

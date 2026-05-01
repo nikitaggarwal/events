@@ -141,6 +141,15 @@ export default function LandingPage() {
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
+          <Link
+            href="/apply"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-semibold border-2 border-yc-purple text-yc-purple rounded-lg hover:bg-yc-purple hover:text-white transition-colors"
+          >
+            Applicant Console
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
         </div>
 
         <div className="mt-16 animate-bounce text-yc-text-secondary/40">
@@ -504,7 +513,7 @@ export default function LandingPage() {
           <div className="reveal reveal-delay-1 mt-10 bg-white border border-yc-border rounded-xl overflow-hidden max-w-lg">
             <div className="px-5 py-3 border-b border-yc-border bg-yc-bg/50 flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold text-yc-dark">Robot Fight Club</div>
+                <div className="text-sm font-semibold text-yc-dark">Infrastructure & Reliability Hiring Night</div>
                 <div className="text-[10px] text-yc-text-secondary">18 candidates matched to 4 open roles</div>
               </div>
               <Badge variant="orange">Founder View</Badge>
@@ -659,7 +668,7 @@ export default function LandingPage() {
                   </thead>
                   <tbody>
                     {(analytics?.events ?? [
-                      { id: "1", name: "Robot Fight Club", attended: 56, interviewed: 30, hired: 8, status: "completed" },
+                      { id: "1", name: "Infrastructure & Reliability Night", attended: 56, interviewed: 30, hired: 8, status: "completed" },
                       { id: "2", name: "AI/ML Engineers Meetup", attended: 35, interviewed: 18, hired: 8, status: "completed" },
                       { id: "3", name: "Infra & DevTools Night", attended: 38, interviewed: 12, hired: 6, status: "completed" },
                       { id: "4", name: "FinTech Founders", attended: 36, interviewed: 9, hired: 6, status: "completed" },
@@ -677,7 +686,7 @@ export default function LandingPage() {
                 {/* Visual bars per completed event */}
                 <div className="mt-3 space-y-1.5">
                   {(analytics?.events ?? [
-                    { id: "1", name: "Robot Fight Club", sourced: 75, attended: 56, hired: 8, status: "completed" },
+                    { id: "1", name: "Infrastructure & Reliability", sourced: 75, attended: 56, hired: 8, status: "completed" },
                     { id: "2", name: "AI/ML Meetup", sourced: 25, attended: 35, hired: 8, status: "completed" },
                     { id: "3", name: "Infra Night", sourced: 25, attended: 38, hired: 6, status: "completed" },
                   ]).filter((e) => e.status === "completed").slice(0, 4).map((e) => (
@@ -854,6 +863,15 @@ export default function LandingPage() {
                 className="inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-semibold border-2 border-yc-dark text-yc-dark rounded-lg hover:bg-yc-dark hover:text-white transition-colors"
               >
                 Founder Console
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+              <Link
+                href="/apply"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-semibold border-2 border-yc-purple text-yc-purple rounded-lg hover:bg-yc-purple hover:text-white transition-colors"
+              >
+                Applicant Console
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

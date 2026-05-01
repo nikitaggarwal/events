@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { compareEventsByStatusThenDateDesc } from "@/lib/event-sort";
 
 export async function GET(request: NextRequest) {
   const companyId = request.nextUrl.searchParams.get("companyId");
@@ -57,8 +58,9 @@ export async function GET(request: NextRequest) {
   const events = await prisma.event.findMany({
     where: { id: { in: eventIds } },
     select: { id: true, name: true, date: true, status: true },
-    orderBy: { date: "desc" },
   });
+
+  events.sort((a, b) => compareEventsByStatusThenDateDesc(a, b));
 
   const eventRows = events.map((e) => {
     const s = eventMap.get(e.id)!;
